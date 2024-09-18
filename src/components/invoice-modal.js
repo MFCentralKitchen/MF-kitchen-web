@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { updateDoc, doc } from "firebase/firestore";
 import { db } from "../firebase-config";
 import {
@@ -18,16 +18,51 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
+  IconButton,
+  TextField,
 } from "@mui/material";
+import EditIcon from "@mui/icons-material/Edit";
 import html2pdf from "html2pdf.js";
 import LOGO from "../assets/MF-CPU-LOGO.png";
 
 const InvoiceModal = ({ invoice, isModalOpen, handleClose }) => {
   const [editableInvoice, setEditableInvoice] = useState(invoice);
-  const [showDropdowns, setShowDropdowns] = useState(true); // State to control dropdown visibility
+  const [editingIndex, setEditingIndex] = useState(null); // Index of the item being edited
+  const [inputValue, setInputValue] = useState(""); // Price input state
+  const [showDropdown, setShowDropdown] = useState(false);
   const invoiceRef = useRef();
 
+  useEffect(() => {
+    // Update editableInvoice when invoice prop changes
+    setEditableInvoice(invoice);
+  }, [invoice]);
+
+  useEffect(() => {
+    if (editingIndex !== null) {
+      setInputValue(editableInvoice.items[editingIndex].price);
+    }
+  }, [editingIndex, editableInvoice]);
+
+  const handleStatusChange = (field, value) => {
+    setEditableInvoice((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  // Update the total price of the invoice
+  const updateTotalPrice = () => {
+    const totalPrice = editableInvoice.items.reduce((total, item) => {
+      return total + item.price * item.quantity;
+    }, 0);
+    setEditableInvoice((prev) => ({
+      ...prev,
+      totalPrice,
+    }));
+  };
+
   const handleSave = async () => {
+    setShowDropdown(true);
     const invoiceDocRef = doc(db, "invoices", editableInvoice.id);
     try {
       await updateDoc(invoiceDocRef, editableInvoice);
@@ -39,24 +74,53 @@ const InvoiceModal = ({ invoice, isModalOpen, handleClose }) => {
   };
 
   const handleSendInvoice = () => {
-    const element = invoiceRef.current;
-    const options = {
-      margin: [0.5, 0.5],
-      filename: `Invoice_${editableInvoice.id}.pdf`,
-      html2canvas: { scale: 2 },
-      jsPDF: { unit: "in", format: "letter", orientation: "portrait" },
-    };
+    // Ensures the state has been updated before generating the PDF
+    setShowDropdown(true);
+    setTimeout(() => {
+      const element = invoiceRef.current;
+      const options = {
+        margin: [0.5, 0.5],
+        filename: `Invoice_${editableInvoice.id}.pdf`,
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: "in", format: "letter", orientation: "portrait" },
+      };
 
-    html2pdf().from(element).set(options).save();
-    setShowDropdowns(false); // Hide dropdowns after sending the invoice
+      // Clone the element
+      const clone = element.cloneNode(true);
+
+      // Hide edit icons
+      const editIcons = clone.querySelectorAll(".edit-icon");
+      editIcons.forEach((icon) => (icon.style.display = "none"));
+
+      // Replace dropdowns with text in the cloned element
+      const dropdowns = clone.querySelectorAll("select");
+      dropdowns.forEach((dropdown) => {
+        const selectedValue = dropdown.options[dropdown.selectedIndex].text;
+        const span = document.createElement("span");
+        span.textContent = selectedValue;
+        dropdown.parentNode.replaceChild(span, dropdown);
+      });
+
+      // Generate PDF
+      html2pdf().from(clone).set(options).save();
+    }, 100); // Delay to ensure state is updated
   };
 
-  // Handle dropdown changes
-  const handleStatusChange = (field, value) => {
+  const handlePriceChange = (index, value) => {
+    const newItems = [...editableInvoice.items];
+    newItems[index].price = parseFloat(value);
     setEditableInvoice((prev) => ({
       ...prev,
-      [field]: value,
+      items: newItems,
     }));
+    updateTotalPrice();
+  };
+
+  const handleBlur = () => {
+    if (editingIndex !== null) {
+      handlePriceChange(editingIndex, inputValue);
+      setEditingIndex(null); // Hide input field
+    }
   };
 
   return (
@@ -166,7 +230,31 @@ const InvoiceModal = ({ invoice, isModalOpen, handleClose }) => {
                   <TableRow key={index}>
                     <TableCell>{item.title}</TableCell>
                     <TableCell>{item.brand}</TableCell>
-                    <TableCell>{item.price}</TableCell>
+                    <TableCell>
+                      {editingIndex === index ? (
+                        <TextField
+                          autoFocus
+                          value={inputValue}
+                          onChange={(e) => setInputValue(e.target.value)}
+                          onBlur={handleBlur}
+                          onFocus={() => setInputValue(item.price)}
+                          type="number"
+                          size="small"
+                          variant="outlined"
+                        />
+                      ) : (
+                        <>
+                          {item.price}
+                          <IconButton
+                            size="small"
+                            className="edit-icon"
+                            onClick={() => setEditingIndex(index)}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </>
+                      )}
+                    </TableCell>
                     <TableCell>{item.quantity}</TableCell>
                     <TableCell>{item.units}</TableCell>
                     <TableCell>{item.price * item.quantity}</TableCell>
@@ -177,117 +265,72 @@ const InvoiceModal = ({ invoice, isModalOpen, handleClose }) => {
           </TableContainer>
 
           {/* Order and Payment Status */}
+          {showDropdown ? (
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginTop: "16px",
+              }}
+            >
+              <div style={{ width: "45%" }}>
+                <strong>Order Status:</strong> {editableInvoice.orderStatus}
+              </div>
+              <div style={{ width: "45%" }}>
+                <strong>Payment Status:</strong> {editableInvoice.paymentStatus}
+              </div>
+            </div>
+          ) : (
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginTop: "16px",
+              }}
+            >
+              <FormControl fullWidth>
+                <InputLabel id="order-status-label">Order Status</InputLabel>
+                <Select
+                  labelId="order-status-label"
+                  value={editableInvoice.orderStatus}
+                  onChange={(e) => handleStatusChange("orderStatus", e.target.value)}
+                >
+                  <MenuItem value="Pending">Pending</MenuItem>
+                  <MenuItem value="Completed">Completed</MenuItem>
+                </Select>
+              </FormControl>
+              <FormControl fullWidth>
+                <InputLabel id="payment-status-label">Payment Status</InputLabel>
+                <Select
+                  labelId="payment-status-label"
+                  value={editableInvoice.paymentStatus}
+                  onChange={(e) => handleStatusChange("paymentStatus", e.target.value)}
+                >
+                  <MenuItem value="Unpaid">Unpaid</MenuItem>
+                  <MenuItem value="Paid">Paid</MenuItem>
+                </Select>
+              </FormControl>
+            </div>
+          )}
           <div
             style={{
               display: "flex",
               justifyContent: "space-between",
               marginTop: "16px",
+              fontWeight: "bold",
+              borderTop: "2px solid #000",
+              paddingTop: "8px",
             }}
           >
-            {showDropdowns ? (
-              <FormControl fullWidth>
-                <InputLabel>Order Status</InputLabel>
-                <Select
-                  value={editableInvoice.orderStatus}
-                  onChange={(e) =>
-                    handleStatusChange("orderStatus", e.target.value)
-                  }
-                >
-                  <MenuItem value="Pending">Pending</MenuItem>
-                  <MenuItem value="Shipped">Shipped</MenuItem>
-                  <MenuItem value="Delivered">Delivered</MenuItem>
-                </Select>
-              </FormControl>
-            ) : (
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  marginTop: "8px",
-                  width:"100%"
-                }}
-              >
-                <Typography variant="body1">
-                  <strong>Order Status:</strong>
-                </Typography>
-                <Typography variant="body1">
-                  <strong>{editableInvoice.orderStatus}</strong>
-                </Typography>
-              </div>
-            )}
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              marginTop: "8px",
-              width:"100%"
-            }}
-          >
-            {showDropdowns ? (
-              <FormControl fullWidth>
-                <InputLabel>Payment Status</InputLabel>
-                <Select
-                  value={editableInvoice.isBillPaid ? "Paid" : "Pending"}
-                  onChange={(e) =>
-                    handleStatusChange("isBillPaid", e.target.value === "Paid")
-                  }
-                >
-                  <MenuItem value="Paid">Paid</MenuItem>
-                  <MenuItem value="Pending">Pending</MenuItem>
-                </Select>
-              </FormControl>
-            ) : (
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  marginTop: "8px",
-                  width:"100%"
-                }}
-              >
-                <Typography variant="body1">
-                  <strong>Payment Status:</strong>
-                </Typography>
-                <Typography variant="body1">
-                  <strong>
-                    {editableInvoice.isBillPaid ? "Paid" : "Pending"}
-                  </strong>
-                </Typography>
-              </div>
-            )}
-          </div>
-
-          {/* Total Price */}
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              marginTop: "8px",
-            }}
-          >
-            <Typography variant="body1">
-              <strong>Total Price:</strong>
-            </Typography>
-            <Typography variant="body1">
-              <strong>{editableInvoice.totalPrice}</strong>
-            </Typography>
+            <div>Total Items:</div>
+            <div>${editableInvoice.totalPrice.toFixed(2)}</div>
           </div>
         </div>
       </DialogContent>
-
       <DialogActions>
-        <Button onClick={handleSave} color="primary" variant="contained">
-          Save
-        </Button>
-        <Button
-          onClick={handleSendInvoice}
-          color="secondary"
-          variant="contained"
-        >
-          Send Invoice
-        </Button>
+        <Button onClick={handleClose}>Close</Button>
+        <Button onClick={handleSave}>Save</Button>
+        <Button onClick={handleSendInvoice}>Send Invoice</Button>
       </DialogActions>
     </Dialog>
   );

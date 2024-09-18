@@ -8,6 +8,8 @@ import {
   CircularProgress,
   Snackbar,
   Alert,
+  useMediaQuery,
+  Box,
 } from "@mui/material";
 import { Visibility, VisibilityOff } from "@mui/icons-material";
 import {
@@ -58,7 +60,7 @@ const AddUsers = () => {
     const ukPhoneRegex = /^(\+44\s?7\d{3}|\(?07\d{3}\)?|\d{5}|\d{4})\s?\d{3,4}\s?\d{3,4}$/;
     return ukPhoneRegex.test(phone);
   };
-  
+  const isMobile = useMediaQuery("(max-width:600px)");
 
   const validateForm = () => {
     let formErrors = {};
@@ -164,9 +166,9 @@ const AddUsers = () => {
   };
 
   return (
-    <div>
+    <Box sx={{ backgroundColor: "#FFFAE1", color: "#C70A0A" }}>
       <Header title='Add User'/>
-      <div style={{ maxWidth: "600px", margin: "0 auto", padding: "20px" }}>
+      <div style={{ maxWidth: "100%", margin: "0 auto", padding:!isMobile? "150px":'20px',backgroundColor:'#FFFAE1',height:isMobile ?'700px':'320Px' }}>
         <form onSubmit={handleSubmit}>
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
@@ -288,9 +290,10 @@ const AddUsers = () => {
           <div style={{ textAlign: "center", marginTop: "20px" }}>
             <Button
               variant="contained"
-              color="primary"
+              color="#C70A0A"
               type="submit"
               style={{ width: "150px" }}
+              sx={{ backgroundColor: "#FFB500" ,color:'white'}}
               disabled={loading} // Disable button during loading
             >
               {loading ? <CircularProgress size={24} /> : "Add User"}
@@ -312,7 +315,7 @@ const AddUsers = () => {
           </Alert>
         </Snackbar>
       </div>
-    </div>
+    </Box>
   );
 };
 

@@ -12,6 +12,8 @@ import {
   IconButton,
   CircularProgress,
   Snackbar,
+  Grid,
+  Box,
 } from "@mui/material";
 import {
   collection,
@@ -21,7 +23,6 @@ import {
   query,
   where,
   getDocs,
-  addDoc,
 } from "firebase/firestore";
 import { db } from "../firebase-config";
 import AddCategoryModal from "../components/add-category-modal";
@@ -37,58 +38,35 @@ const Inventory = () => {
   const [addProductOpen, setAddProductOpen] = useState(false);
   const [orderBy, setOrderBy] = useState("title");
   const [orderDirection, setOrderDirection] = useState("asc");
-  const [editingItemId, setEditingItemId] = useState(null); // Track which item is being edited
-  const [editingField, setEditingField] = useState(null); // Track which field (price or quantity) is being edited
-  const [updatedValues, setUpdatedValues] = useState({}); // Store updated quantity/price values
-  const [loadingField, setLoadingField] = useState(null); // Track loading for the specific field
+  const [editingItemId, setEditingItemId] = useState(null);
+  const [editingField, setEditingField] = useState(null);
+  const [updatedValues, setUpdatedValues] = useState({});
+  const [loadingField, setLoadingField] = useState(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [initialLoading, setInitialLoading] = useState(false);
+  const [totals, setTotals] = useState({
+    totalQuantity: 0,
+    totalSold: 0,
+    totalPrice: 0,
+  });
 
-  const uploadSampleInvoiceData = async () => {
-    const invoiceData = {
-      userId: 1,
-      createdAt: new Date(),
-      name: "user1",
-      restaurantName: "Paradise",
-      email: "user1@gmail.com",
-      phone: "1234567890",
-      items: [
-        {
-          title: "Turmeric Haldi Powder",
-          brand: "Brand Natco",
-          price: 200,
-          quantity: 2,
-        },
-        {
-          title: "Chilli Haldi Powder",
-          brand: "Brand Natco",
-          price: 300,
-          quantity: 4,
-        },
-      ],
-      orderStatus: "pending", // Can be "pending", "accepted", "delivered"
-      deliveryCharges: 12,
-      tax: 1,
-      totalPrice: 912, // Calculate based on items, delivery, and tax
-      isBillPayed: false,
-    };
+  const calculateTotals = (items) => {
+    let totalQuantity = 0;
+    let totalSold = 0;
+    let totalPrice = 0;
 
-    try {
-      // Upload sample data to Firestore
-      await addDoc(collection(db, "invoices"), {
-        ...invoiceData, // Comment this line or remove in future if Firestore auto-generates IDs
-      });
-      console.log("Invoice added to the database");
-    } catch (err) {
-      console.error("Error uploading invoice data: ", err);
-    }
+    items.forEach((product) => {
+      totalQuantity += product.availableQuantity || 0;
+      totalSold += product.soldQuantity || 0;
+      totalPrice += product.availableQuantity * product.price || 0;
+    });
+
+    setTotals({ totalQuantity, totalSold, totalPrice });
   };
 
   useEffect(() => {
-    // uploadSampleInvoiceData()
     setInitialLoading(true);
-
     const unsubscribe = onSnapshot(
       collection(db, Collections.INVENTORY_ITEMS),
       (snapshot) => {
@@ -98,27 +76,24 @@ const Inventory = () => {
         }));
 
         setProducts(updatedItems);
-
-        // Set initial loading to false after data is fetched
+        calculateTotals(updatedItems); // Calculate totals once data is fetched
         setInitialLoading(false);
       },
       (error) => {
         console.error("Error fetching data: ", error);
-        setInitialLoading(false); // Ensure loading state is cleared on error
+        setInitialLoading(false);
       }
     );
 
     return () => unsubscribe();
   }, []);
 
-  // Handle sorting logic
   const handleSort = (column) => {
     const isAsc = orderBy === column && orderDirection === "asc";
     setOrderDirection(isAsc ? "desc" : "asc");
     setOrderBy(column);
   };
 
-  // Sort products based on the selected column and direction
   const sortedProducts = [...products].sort((a, b) => {
     if (orderDirection === "asc") {
       return a[orderBy] > b[orderBy] ? 1 : -1;
@@ -127,12 +102,10 @@ const Inventory = () => {
     }
   });
 
-  // Filter products based on search term
   const filteredProducts = sortedProducts.filter((product) =>
     product.title.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Handle input change for quantity and price during editing
   const handleFieldChange = (itemId, field, value) => {
     setUpdatedValues((prev) => ({
       ...prev,
@@ -140,13 +113,10 @@ const Inventory = () => {
     }));
   };
 
-  // Save updated quantity or price
   const handleUpdate = async (itemId, field) => {
-    // Get the new value from the state
     const newValue = updatedValues[itemId]?.[field];
     if (newValue === undefined) return;
 
-    // Find the Firestore document ID using the UUID (itemId)
     try {
       const inventoryQuery = query(
         collection(db, Collections.INVENTORY_ITEMS),
@@ -159,13 +129,15 @@ const Inventory = () => {
         return;
       }
 
-      const docId = querySnapshot.docs[0].id; // Get the document ID
-
+      const docId = querySnapshot.docs[0].id;
       const itemRef = doc(db, Collections.INVENTORY_ITEMS, docId);
+
       setLoadingField(field);
 
-      // Perform the update operation
-      await updateDoc(itemRef, { [field]: Number(newValue) });
+      await updateDoc(itemRef, {
+        [field]: Number(newValue),
+        updatedAt: new Date(), // Add updatedAt field on edit
+      });
 
       setSnackbarMessage(
         `${
@@ -173,8 +145,8 @@ const Inventory = () => {
         } updated successfully!`
       );
       setSnackbarOpen(true);
-      setEditingItemId(null); // Exit edit mode
-      setEditingField(null); // Clear the specific field being edited
+      setEditingItemId(null);
+      setEditingField(null);
     } catch (err) {
       console.error("Error updating item: ", err);
     } finally {
@@ -182,273 +154,291 @@ const Inventory = () => {
     }
   };
 
+  const getInitialValue = (product, field) => {
+    return updatedValues[product.id]?.[field] ?? product[field];
+  };
+
   return (
-    <div>
+    <Box sx={{ backgroundColor: "#FFFAE1", color: "#C70A0A" }}>
       <Header title="Inventory" />
-      <div style={{ padding: "20px" }}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            marginBottom: "20px",
-          }}
-        >
+      <Grid container spacing={3} alignItems="center" mb={3}>
+        <Grid item xs={12} md={5} margin={2}>
           <TextField
+            fullWidth
             label="Search Products"
             variant="outlined"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
-          <div>
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={() => setAddCategoryOpen(true)}
-              style={{ marginRight: "10px" }}
-            >
-              Add Category
-            </Button>
-            <Button
-              variant="contained"
-              color="secondary"
-              onClick={() => setAddProductOpen(true)}
-            >
-              Add Product
-            </Button>
-          </div>
-        </div>
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>
-                  <TableSortLabel
-                    active={orderBy === "title"}
-                    direction={orderBy === "title" ? orderDirection : "asc"}
-                    onClick={() => handleSort("title")}
-                  >
-                    Title
-                  </TableSortLabel>
-                </TableCell>
-                <TableCell>
-                  <TableSortLabel
-                    active={orderBy === "brand"}
-                    direction={orderBy === "brand" ? orderDirection : "asc"}
-                    onClick={() => handleSort("brand")}
-                  >
-                    Brand
-                  </TableSortLabel>
-                </TableCell>
+        </Grid>
+        <Grid
+          item
+          xs={12}
+          md={6}
+          sx={{
+            display: "flex",
+            justifyContent: { xs: "center", md: "flex-end" },
+            gap: 2,
+          }}
+        >
+          <Button
+            variant="contained"
+            onClick={() => setAddCategoryOpen(true)}
+            sx={{ backgroundColor: "#C70A0A" }}
+          >
+            Add Category
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => setAddProductOpen(true)}
+            sx={{ backgroundColor: "#FFB500" }}
+          >
+            Add Product
+          </Button>
+        </Grid>
+      </Grid>
 
-                {/* Price Column */}
-                <TableCell>
-                  <TableSortLabel
-                    active={orderBy === "price"}
-                    direction={orderBy === "price" ? orderDirection : "asc"}
-                    onClick={() => handleSort("price")}
-                  >
-                    Price
-                  </TableSortLabel>
-                </TableCell>
+      <TableContainer sx={{ maxWidth: "100%", overflowX: "auto" }}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>
+                <TableSortLabel
+                  active={orderBy === "title"}
+                  direction={orderBy === "title" ? orderDirection : "asc"}
+                  onClick={() => handleSort("title")}
+                >
+                  Title
+                </TableSortLabel>
+              </TableCell>
+              <TableCell>
+                <TableSortLabel
+                  active={orderBy === "brand"}
+                  direction={orderBy === "brand" ? orderDirection : "asc"}
+                  onClick={() => handleSort("brand")}
+                >
+                  Brand
+                </TableSortLabel>
+              </TableCell>
+              <TableCell>
+                <TableSortLabel
+                  active={orderBy === "price"}
+                  direction={orderBy === "price" ? orderDirection : "asc"}
+                  onClick={() => handleSort("price")}
+                >
+                  Price per unit
+                </TableSortLabel>
+              </TableCell>
+              <TableCell>Vendor</TableCell>
+              <TableCell>
+                <TableSortLabel
+                  active={orderBy === "availableQuantity"}
+                  direction={
+                    orderBy === "availableQuantity" ? orderDirection : "asc"
+                  }
+                  onClick={() => handleSort("availableQuantity")}
+                >
+                  Quantity in stock
+                </TableSortLabel>
+              </TableCell>
+              <TableCell>
+                <TableSortLabel
+                  active={orderBy === "soldQuantity"}
+                  direction={
+                    orderBy === "soldQuantity" ? orderDirection : "asc"
+                  }
+                  onClick={() => handleSort("soldQuantity")}
+                >
+                  Stock out
+                </TableSortLabel>
+              </TableCell>
+              <TableCell>
+                <TableSortLabel
+                  active={orderBy === "updatedAt"}
+                  direction={orderBy === "updatedAt" ? orderDirection : "asc"}
+                  onClick={() => handleSort("updatedAt")}
+                >
+                  Updated At
+                </TableSortLabel>
+              </TableCell>
+              <TableCell>Total Price</TableCell>
+            </TableRow>
+          </TableHead>
+          {initialLoading ? (
+            <CircularProgress size={50} />
+          ) : (
+            <TableBody>
+              {filteredProducts.map((product) => (
+                <TableRow key={product.id}>
+                  <TableCell>{product.title}</TableCell>
+                  <TableCell>{product.brand}</TableCell>
+                  <TableCell>{product.price} £</TableCell>
+                  <TableCell>{product.vendor}</TableCell>
+                  <TableCell>
+                    {editingItemId === product.id &&
+                    editingField === "availableQuantity" ? (
+                      <TextField
+                        value={getInitialValue(product, "availableQuantity")}
+                        onChange={(e) =>
+                          handleFieldChange(
+                            product.id,
+                            "availableQuantity",
+                            e.target.value
+                          )
+                        }
+                        size="small"
+                        variant="outlined"
+                        type="number"
+                        disabled={loadingField === "availableQuantity"}
+                      />
+                    ) : (
+                      product.availableQuantity
+                    )}
+                    {editingItemId === product.id &&
+                    editingField === "availableQuantity" ? (
+                      <IconButton
+                        color="primary"
+                        onClick={() =>
+                          handleUpdate(product.id, "availableQuantity")
+                        }
+                        disabled={loadingField === "availableQuantity"}
+                      >
+                        <Save />
+                      </IconButton>
+                    ) : (
+                      <IconButton
+                        color="primary"
+                        onClick={() => {
+                          setEditingItemId(product.id);
+                          setEditingField("availableQuantity");
+                          setUpdatedValues((prev) => ({
+                            ...prev,
+                            [product.id]: {
+                              ...prev[product.id],
+                              availableQuantity: product.availableQuantity,
+                            },
+                          }));
+                        }}
+                      >
+                        <Edit />
+                      </IconButton>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {editingItemId === product.id &&
+                    editingField === "soldQuantity" ? (
+                      <TextField
+                        value={getInitialValue(product, "soldQuantity")}
+                        onChange={(e) =>
+                          handleFieldChange(
+                            product.id,
+                            "soldQuantity",
+                            e.target.value
+                          )
+                        }
+                        size="small"
+                        variant="outlined"
+                        type="number"
+                        disabled={loadingField === "soldQuantity"}
+                      />
+                    ) : (
+                      product.soldQuantity
+                    )}
+                    {editingItemId === product.id &&
+                    editingField === "soldQuantity" ? (
+                      <IconButton
+                        color="primary"
+                        onClick={() => handleUpdate(product.id, "soldQuantity")}
+                        disabled={loadingField === "soldQuantity"}
+                      >
+                        <Save />
+                      </IconButton>
+                    ) : (
+                      <IconButton
+                        color="primary"
+                        onClick={() => {
+                          setEditingItemId(product.id);
+                          setEditingField("soldQuantity");
+                          setUpdatedValues((prev) => ({
+                            ...prev,
+                            [product.id]: {
+                              ...prev[product.id],
+                              soldQuantity: product.soldQuantity,
+                            },
+                          }));
+                        }}
+                      >
+                        <Edit />
+                      </IconButton>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {product.updatedAt
+                      ? new Date(
+                          product.updatedAt.seconds * 1000
+                        ).toLocaleString("en-GB", {
+                          year: "numeric",
+                          month: "2-digit",
+                          day: "2-digit",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
+                      : typeof product.createdAt === "string"
+                      ? new Date(product.createdAt).toLocaleString("en-GB", {
+                          year: "numeric",
+                          month: "2-digit",
+                          day: "2-digit",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
+                      : new Date(
+                          product.createdAt.seconds * 1000
+                        ).toLocaleString("en-GB", {
+                          year: "numeric",
+                          month: "2-digit",
+                          day: "2-digit",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                  </TableCell>
 
-                {/* Vendor */}
+                  <TableCell>
+                    {product.price * product.availableQuantity || 0} £
+                  </TableCell>
+                </TableRow>
+              ))}
+              <TableRow sx={{ backgroundColor: "#FFB500" }}>
+                <TableCell colSpan={4}></TableCell>
                 <TableCell>
-                  <TableSortLabel
-                    active={orderBy === "vendor"}
-                    direction={orderBy === "vendor" ? orderDirection : "asc"}
-                    onClick={() => handleSort("vendor")}
-                  >
-                    Vendor
-                  </TableSortLabel>
+                  <strong>{totals.totalQuantity}</strong>
                 </TableCell>
-
-                {/* Available Quantity */}
                 <TableCell>
-                  <TableSortLabel
-                    active={orderBy === "availableQuantity"}
-                    direction={
-                      orderBy === "availableQuantity" ? orderDirection : "asc"
-                    }
-                    onClick={() => handleSort("availableQuantity")}
-                  >
-                    Available Quantity
-                  </TableSortLabel>
+                  <strong>{totals.totalSold}</strong>
                 </TableCell>
-
-                {/* Sold Quantity */}
+                <TableCell></TableCell>
                 <TableCell>
-                  <TableSortLabel
-                    active={orderBy === "soldQuantity"}
-                    direction={
-                      orderBy === "soldQuantity" ? orderDirection : "asc"
-                    }
-                    onClick={() => handleSort("soldQuantity")}
-                  >
-                    Sold Quantity
-                  </TableSortLabel>
+                  <strong>{totals.totalPrice.toFixed(2)} £</strong>
                 </TableCell>
-                <TableCell>Total Price</TableCell>
               </TableRow>
-            </TableHead>
-            {initialLoading ? (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center", // Center vertically
-                  justifyContent: "center", // Center horizontally
-                  width: "100%", // Full width of the parent
-                  height: "100vh",
-                  marginLeft: 330, // Full viewport height
-                }}
-              >
-                <CircularProgress size={50} />
-              </div>
-            ) : (
-              <TableBody>
-                {filteredProducts.map((product) => (
-                  <TableRow key={product.id}>
-                    <TableCell>{product.title}</TableCell>
-                    <TableCell>{product.brand}</TableCell>
-
-                    {/* Price Field */}
-                    <TableCell>
-                      {editingItemId === product.id &&
-                      editingField === "price" ? (
-                        <>
-                          <TextField
-                            value={
-                              updatedValues[product.id]?.price !== undefined
-                                ? updatedValues[product.id].price
-                                : product.price
-                            }
-                            onChange={(e) =>
-                              handleFieldChange(
-                                product.id,
-                                "price",
-                                e.target.value === ""
-                                  ? ""
-                                  : Number(e.target.value)
-                              )
-                            }
-                            size="small"
-                            type="number"
-                            style={{ maxWidth: "100px" }} // Limit input field width
-                          />
-                          <Button
-                            onClick={() => handleUpdate(product.id, "price")}
-                            disabled={loadingField === "price"}
-                            startIcon={
-                              loadingField === "price" ? (
-                                <CircularProgress size={20} />
-                              ) : (
-                                <Save />
-                              )
-                            }
-                          >
-                            Save
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          {product.price}
-                          <IconButton
-                            onClick={() => {
-                              setEditingItemId(product.id);
-                              setEditingField("price");
-                            }}
-                          >
-                            <Edit />
-                          </IconButton>
-                        </>
-                      )}
-                    </TableCell>
-                    <TableCell>{product.vendor}</TableCell>
-                    {/* Available Quantity Field */}
-                    <TableCell>
-                      {editingItemId === product.id &&
-                      editingField === "availableQuantity" ? (
-                        <>
-                          <TextField
-                            value={
-                              updatedValues[product.id]?.availableQuantity !==
-                              undefined
-                                ? updatedValues[product.id].availableQuantity
-                                : product.availableQuantity
-                            }
-                            onChange={(e) =>
-                              handleFieldChange(
-                                product.id,
-                                "availableQuantity",
-                                e.target.value === ""
-                                  ? ""
-                                  : Number(e.target.value)
-                              )
-                            }
-                            size="small"
-                            type="number"
-                            style={{ maxWidth: "100px" }} // Limit input field width
-                          />
-                          <Button
-                            onClick={() =>
-                              handleUpdate(product.id, "availableQuantity")
-                            }
-                            disabled={loadingField === "availableQuantity"}
-                            startIcon={
-                              loadingField === "availableQuantity" ? (
-                                <CircularProgress size={20} />
-                              ) : (
-                                <Save />
-                              )
-                            }
-                          >
-                            Save
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          {product.availableQuantity}
-                          <IconButton
-                            onClick={() => {
-                              setEditingItemId(product.id);
-                              setEditingField("availableQuantity");
-                            }}
-                          >
-                            <Edit />
-                          </IconButton>
-                        </>
-                      )}
-                    </TableCell>
-
-                    <TableCell>{product.soldQuantity}</TableCell>
-                    <TableCell>
-                      {product.availableQuantity * product.price}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            )}
-          </Table>
-        </TableContainer>
-
-        {/* Add Category Modal */}
-        <AddCategoryModal
-          open={addCategoryOpen}
-          onClose={() => setAddCategoryOpen(false)}
-        />
-        {/* Add Product Modal */}
-        <AddProductModal
-          open={addProductOpen}
-          onClose={() => setAddProductOpen(false)}
-        />
-
-        <Snackbar
-          open={snackbarOpen}
-          autoHideDuration={3000}
-          onClose={() => setSnackbarOpen(false)}
-          message={snackbarMessage}
-        />
-      </div>
-    </div>
+            </TableBody>
+          )}
+        </Table>
+      </TableContainer>
+      <AddCategoryModal
+        open={addCategoryOpen}
+        onClose={() => setAddCategoryOpen(false)}
+      />
+      <AddProductModal
+        open={addProductOpen}
+        onClose={() => setAddProductOpen(false)}
+      />
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={6000}
+        onClose={() => setSnackbarOpen(false)}
+        message={snackbarMessage}
+      />
+    </Box>
   );
 };
 

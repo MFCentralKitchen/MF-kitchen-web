@@ -1,10 +1,12 @@
 import React, { useContext } from 'react';
 import { AuthContext } from '../auth-context';
 import { useNavigate } from 'react-router-dom'; // Import useNavigate for navigation
+import { useMediaQuery } from '@mui/material';
 
 const Header = ({title}) => {
   const { logout } = useContext(AuthContext);
   const navigate = useNavigate(); // Initialize useNavigate hook
+  const isMobile = useMediaQuery("(max-width:600px)");
 
   const handleLogout = () => {
     logout(); // Call logout from context
@@ -17,11 +19,13 @@ const Header = ({title}) => {
         display: "flex",
         alignItems: "center",
         padding: "20px",
-        backgroundColor: "#f0f0f0",
         justifyContent: "space-between", // Ensures space between items
-        width:'98%',
+        width:isMobile ? '92%' :'97.5%',
         marginLeft:-8,
-        marginTop:-7
+        marginTop:-7,
+        backgroundColor: "#f8f4e1", 
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+        zIndex: 1000,
       }}
     >
       <div style={{ textAlign: 'center', width: '100%' }}>
@@ -34,7 +38,7 @@ const Header = ({title}) => {
         onClick={handleLogout}
         style={{
           padding: "10px 20px",
-          backgroundColor: "#007bff",
+          backgroundColor: "red",
           color: "white",
           border: "none",
           borderRadius: "4px",
