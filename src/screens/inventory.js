@@ -24,6 +24,7 @@ import {
   where,
   getDocs,
 } from "firebase/firestore";
+import { Timestamp } from "firebase/firestore"; // Import Timestamp
 import { db } from "../firebase-config";
 import AddCategoryModal from "../components/add-category-modal";
 import AddProductModal from "../components/add-product-modal";
@@ -50,7 +51,7 @@ const Inventory = () => {
     totalSold: 0,
     totalPrice: 0,
   });
-
+  const [categories, setCategories] = useState([]);
   const calculateTotals = (items) => {
     let totalQuantity = 0;
     let totalSold = 0;
@@ -67,6 +68,25 @@ const Inventory = () => {
 
   useEffect(() => {
     setInitialLoading(true);
+
+    // Fetch categories
+    const fetchCategories = async () => {
+      try {
+        const categorySnapshot = await getDocs(
+          collection(db, Collections.INVENTORY_CATEGORY)
+        );
+        const categoriesData = categorySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setCategories(categoriesData);
+      } catch (error) {
+        console.error("Error fetching categories: ", error);
+      }
+    };
+
+    fetchCategories();
+
     const unsubscribe = onSnapshot(
       collection(db, Collections.INVENTORY_ITEMS),
       (snapshot) => {
@@ -76,7 +96,7 @@ const Inventory = () => {
         }));
 
         setProducts(updatedItems);
-        calculateTotals(updatedItems); // Calculate totals once data is fetched
+        calculateTotals(updatedItems);
         setInitialLoading(false);
       },
       (error) => {
@@ -90,8 +110,16 @@ const Inventory = () => {
 
   const handleSort = (column) => {
     const isAsc = orderBy === column && orderDirection === "asc";
-    setOrderDirection(isAsc ? "desc" : "asc");
     setOrderBy(column);
+    setOrderDirection(isAsc ? "desc" : "asc");
+
+    const sortedProducts = [...filteredProducts].sort((a, b) => {
+      if (a[column] < b[column]) return isAsc ? -1 : 1;
+      if (a[column] > b[column]) return isAsc ? 1 : -1;
+      return 0;
+    });
+
+    setProducts(sortedProducts);
   };
 
   const sortedProducts = [...products].sort((a, b) => {
@@ -134,14 +162,21 @@ const Inventory = () => {
 
       setLoadingField(field);
 
+      // Store units as text
       await updateDoc(itemRef, {
-        [field]: Number(newValue),
-        updatedAt: new Date(), // Add updatedAt field on edit
+        [field]: String(newValue), // Convert to string for units
+        updatedAt: new Date(),
       });
 
       setSnackbarMessage(
         `${
-          field === "availableQuantity" ? "Quantity" : "Price"
+          field === "availableQuantity"
+            ? "Quantity"
+            : field === "price"
+            ? "Price"
+            : field === "units" // Handle units specifically
+            ? "Units"
+            : ""
         } updated successfully!`
       );
       setSnackbarOpen(true);
@@ -149,6 +184,8 @@ const Inventory = () => {
       setEditingField(null);
     } catch (err) {
       console.error("Error updating item: ", err);
+      setSnackbarMessage("Error updating item. Please try again.");
+      setSnackbarOpen(true);
     } finally {
       setLoadingField(null);
     }
@@ -202,7 +239,7 @@ const Inventory = () => {
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell>
+              <TableCell style={{ fontWeight: "bold" }}>
                 <TableSortLabel
                   active={orderBy === "title"}
                   direction={orderBy === "title" ? orderDirection : "asc"}
@@ -211,7 +248,7 @@ const Inventory = () => {
                   Title
                 </TableSortLabel>
               </TableCell>
-              <TableCell>
+              <TableCell style={{ fontWeight: "bold" }}>
                 <TableSortLabel
                   active={orderBy === "brand"}
                   direction={orderBy === "brand" ? orderDirection : "asc"}
@@ -220,17 +257,34 @@ const Inventory = () => {
                   Brand
                 </TableSortLabel>
               </TableCell>
-              <TableCell>
+              <TableCell style={{ fontWeight: "bold" }}>
                 <TableSortLabel
-                  active={orderBy === "price"}
-                  direction={orderBy === "price" ? orderDirection : "asc"}
-                  onClick={() => handleSort("price")}
+                  active={orderBy === "vendor"}
+                  direction={orderBy === "vendor" ? orderDirection : "asc"}
+                  onClick={() => handleSort("vendor")}
                 >
-                  Price per unit
+                  Vendor
                 </TableSortLabel>
               </TableCell>
-              <TableCell>Vendor</TableCell>
-              <TableCell>
+              <TableCell style={{ fontWeight: "bold" }}>
+                <TableSortLabel
+                  active={orderBy === "category"}
+                  direction={orderBy === "category" ? orderDirection : "asc"}
+                  onClick={() => handleSort("category")}
+                >
+                  Category
+                </TableSortLabel>
+              </TableCell>
+              <TableCell style={{ fontWeight: "bold" }}>
+                <TableSortLabel
+                  active={orderBy === "units"}
+                  direction={orderBy === "units" ? orderDirection : "asc"}
+                  onClick={() => handleSort("units")}
+                >
+                  Units
+                </TableSortLabel>
+              </TableCell>
+              <TableCell style={{ fontWeight: "bold" }}>
                 <TableSortLabel
                   active={orderBy === "availableQuantity"}
                   direction={
@@ -241,7 +295,16 @@ const Inventory = () => {
                   Quantity in stock
                 </TableSortLabel>
               </TableCell>
-              <TableCell>
+              <TableCell style={{ fontWeight: "bold" }}>
+                <TableSortLabel
+                  active={orderBy === "price"}
+                  direction={orderBy === "price" ? orderDirection : "asc"}
+                  onClick={() => handleSort("price")}
+                >
+                  Price per unit
+                </TableSortLabel>
+              </TableCell>
+              <TableCell style={{ fontWeight: "bold" }}>
                 <TableSortLabel
                   active={orderBy === "soldQuantity"}
                   direction={
@@ -252,7 +315,8 @@ const Inventory = () => {
                   Stock out
                 </TableSortLabel>
               </TableCell>
-              <TableCell>
+              <TableCell style={{ fontWeight: "bold" }}>Total Price</TableCell>
+              <TableCell style={{ fontWeight: "bold" }}>
                 <TableSortLabel
                   active={orderBy === "updatedAt"}
                   direction={orderBy === "updatedAt" ? orderDirection : "asc"}
@@ -261,9 +325,9 @@ const Inventory = () => {
                   Updated At
                 </TableSortLabel>
               </TableCell>
-              <TableCell>Total Price</TableCell>
             </TableRow>
           </TableHead>
+
           {initialLoading ? (
             <CircularProgress size={50} />
           ) : (
@@ -272,8 +336,59 @@ const Inventory = () => {
                 <TableRow key={product.id}>
                   <TableCell>{product.title}</TableCell>
                   <TableCell>{product.brand}</TableCell>
-                  <TableCell>{product.price} £</TableCell>
                   <TableCell>{product.vendor}</TableCell>
+                  <TableCell>
+                    {categories.find((cat) => cat.id === product.categoryId)
+                      ?.category || "N/A"}
+                  </TableCell>
+
+                  {/* Editable Units */}
+                  <TableCell>
+                    {editingItemId === product.id &&
+                    editingField === "units" ? (
+                      <TextField
+                        value={getInitialValue(product, "units")}
+                        onChange={(e) =>
+                          handleFieldChange(product.id, "units", e.target.value)
+                        }
+                        size="small"
+                        variant="outlined"
+                        type="text" // Change type to "text"
+                        disabled={loadingField === "units"}
+                      />
+                    ) : (
+                      product.units
+                    )}
+                    {editingItemId === product.id &&
+                    editingField === "units" ? (
+                      <IconButton
+                        color="primary"
+                        onClick={() => handleUpdate(product.id, "units")}
+                        disabled={loadingField === "units"}
+                      >
+                        <Save />
+                      </IconButton>
+                    ) : (
+                      <IconButton
+                        color="primary"
+                        onClick={() => {
+                          setEditingItemId(product.id);
+                          setEditingField("units");
+                          setUpdatedValues((prev) => ({
+                            ...prev,
+                            [product.id]: {
+                              ...prev[product.id],
+                              units: product.units,
+                            },
+                          }));
+                        }}
+                      >
+                        <Edit />
+                      </IconButton>
+                    )}
+                  </TableCell>
+
+                  {/* Editable Quantity in Stock */}
                   <TableCell>
                     {editingItemId === product.id &&
                     editingField === "availableQuantity" ? (
@@ -324,32 +439,30 @@ const Inventory = () => {
                       </IconButton>
                     )}
                   </TableCell>
+
+                  {/* Editable Price */}
                   <TableCell>
                     {editingItemId === product.id &&
-                    editingField === "soldQuantity" ? (
+                    editingField === "price" ? (
                       <TextField
-                        value={getInitialValue(product, "soldQuantity")}
+                        value={getInitialValue(product, "price")}
                         onChange={(e) =>
-                          handleFieldChange(
-                            product.id,
-                            "soldQuantity",
-                            e.target.value
-                          )
+                          handleFieldChange(product.id, "price", e.target.value)
                         }
                         size="small"
                         variant="outlined"
                         type="number"
-                        disabled={loadingField === "soldQuantity"}
+                        disabled={loadingField === "price"}
                       />
                     ) : (
-                      product.soldQuantity
+                      `£ ${product.price}`
                     )}
                     {editingItemId === product.id &&
-                    editingField === "soldQuantity" ? (
+                    editingField === "price" ? (
                       <IconButton
                         color="primary"
-                        onClick={() => handleUpdate(product.id, "soldQuantity")}
-                        disabled={loadingField === "soldQuantity"}
+                        onClick={() => handleUpdate(product.id, "price")}
+                        disabled={loadingField === "price"}
                       >
                         <Save />
                       </IconButton>
@@ -358,12 +471,12 @@ const Inventory = () => {
                         color="primary"
                         onClick={() => {
                           setEditingItemId(product.id);
-                          setEditingField("soldQuantity");
+                          setEditingField("price");
                           setUpdatedValues((prev) => ({
                             ...prev,
                             [product.id]: {
                               ...prev[product.id],
-                              soldQuantity: product.soldQuantity,
+                              price: product.price,
                             },
                           }));
                         }}
@@ -372,43 +485,29 @@ const Inventory = () => {
                       </IconButton>
                     )}
                   </TableCell>
+
+                  {/* Stock Out */}
+                  <TableCell>{product.soldQuantity}</TableCell>
+
+                  {/* Total Price */}
+                  <TableCell>
+                    £ {(product.price * product.availableQuantity).toFixed(1)}
+                  </TableCell>
+
+                  {/* Updated At */}
                   <TableCell>
                     {product.updatedAt
                       ? new Date(
                           product.updatedAt.seconds * 1000
-                        ).toLocaleString("en-GB", {
-                          year: "numeric",
-                          month: "2-digit",
-                          day: "2-digit",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })
-                      : typeof product.createdAt === "string"
-                      ? new Date(product.createdAt).toLocaleString("en-GB", {
-                          year: "numeric",
-                          month: "2-digit",
-                          day: "2-digit",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })
-                      : new Date(
-                          product.createdAt.seconds * 1000
-                        ).toLocaleString("en-GB", {
-                          year: "numeric",
-                          month: "2-digit",
-                          day: "2-digit",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                  </TableCell>
-
-                  <TableCell>
-                    {product.price * product.availableQuantity || 0} £
+                        ).toLocaleString("en-GB")
+                      : product.createdAt
+                      ? new Date(product.createdAt).toLocaleString("en-GB") // Assuming createdAt is in ISO string format
+                      : "N/A"}
                   </TableCell>
                 </TableRow>
               ))}
               <TableRow sx={{ backgroundColor: "#FFB500" }}>
-                <TableCell colSpan={4}></TableCell>
+                <TableCell colSpan={6}></TableCell>
                 <TableCell>
                   <strong>{totals.totalQuantity}</strong>
                 </TableCell>
@@ -417,13 +516,14 @@ const Inventory = () => {
                 </TableCell>
                 <TableCell></TableCell>
                 <TableCell>
-                  <strong>{totals.totalPrice.toFixed(2)} £</strong>
+                  <strong>£ {totals.totalPrice.toFixed(2)}</strong>
                 </TableCell>
               </TableRow>
             </TableBody>
           )}
         </Table>
       </TableContainer>
+
       <AddCategoryModal
         open={addCategoryOpen}
         onClose={() => setAddCategoryOpen(false)}
@@ -432,9 +532,10 @@ const Inventory = () => {
         open={addProductOpen}
         onClose={() => setAddProductOpen(false)}
       />
+
       <Snackbar
         open={snackbarOpen}
-        autoHideDuration={6000}
+        autoHideDuration={3000}
         onClose={() => setSnackbarOpen(false)}
         message={snackbarMessage}
       />

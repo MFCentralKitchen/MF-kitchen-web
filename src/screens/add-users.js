@@ -166,9 +166,9 @@ const AddUsers = () => {
   };
 
   return (
-    <Box sx={{ backgroundColor: "#FFFAE1", color: "#C70A0A" }}>
+    <Box sx={{ color: "#C70A0A" }}>
       <Header title='Add User'/>
-      <div style={{ maxWidth: "100%", margin: "0 auto", padding:!isMobile? "150px":'20px',backgroundColor:'#FFFAE1',height:isMobile ?'700px':'320Px' }}>
+      <div style={{ maxWidth: "100%", margin: "0 auto", padding:!isMobile? "150px":'20px',height:isMobile ?'700px':'320Px' }}>
         <form onSubmit={handleSubmit}>
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>

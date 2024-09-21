@@ -48,7 +48,7 @@ const LoginScreen = () => {
 
       if (!querySnapshot.empty) {
         login({ username });
-        navigate('/add-users');
+        navigate('/dashboard');
       } else {
         setError('Incorrect username or password');
       }

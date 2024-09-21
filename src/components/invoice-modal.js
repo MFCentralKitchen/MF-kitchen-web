@@ -14,12 +14,12 @@ import {
   DialogActions,
   TableContainer,
   TableHead,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
   IconButton,
   TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import html2pdf from "html2pdf.js";
@@ -28,20 +28,14 @@ import LOGO from "../assets/MF-CPU-LOGO.png";
 const InvoiceModal = ({ invoice, isModalOpen, handleClose }) => {
   const [editableInvoice, setEditableInvoice] = useState(invoice);
   const [editingIndex, setEditingIndex] = useState(null); // Index of the item being edited
-  const [inputValue, setInputValue] = useState(""); // Price input state
+  const [inputValue, setInputValue] = useState(""); // For editing price and quantity
+  const [editField, setEditField] = useState(null); // Field being edited (price, quantity, etc.)
   const [showDropdown, setShowDropdown] = useState(false);
   const invoiceRef = useRef();
 
   useEffect(() => {
-    // Update editableInvoice when invoice prop changes
-    setEditableInvoice(invoice);
+    setEditableInvoice(invoice); // Update when invoice prop changes
   }, [invoice]);
-
-  useEffect(() => {
-    if (editingIndex !== null) {
-      setInputValue(editableInvoice.items[editingIndex].price);
-    }
-  }, [editingIndex, editableInvoice]);
 
   const handleStatusChange = (field, value) => {
     setEditableInvoice((prev) => ({
@@ -50,7 +44,6 @@ const InvoiceModal = ({ invoice, isModalOpen, handleClose }) => {
     }));
   };
 
-  // Update the total price of the invoice
   const updateTotalPrice = () => {
     const totalPrice = editableInvoice.items.reduce((total, item) => {
       return total + item.price * item.quantity;
@@ -74,7 +67,6 @@ const InvoiceModal = ({ invoice, isModalOpen, handleClose }) => {
   };
 
   const handleSendInvoice = () => {
-    // Ensures the state has been updated before generating the PDF
     setShowDropdown(true);
     setTimeout(() => {
       const element = invoiceRef.current;
@@ -84,15 +76,10 @@ const InvoiceModal = ({ invoice, isModalOpen, handleClose }) => {
         html2canvas: { scale: 2 },
         jsPDF: { unit: "in", format: "letter", orientation: "portrait" },
       };
-
-      // Clone the element
       const clone = element.cloneNode(true);
-
-      // Hide edit icons
       const editIcons = clone.querySelectorAll(".edit-icon");
       editIcons.forEach((icon) => (icon.style.display = "none"));
 
-      // Replace dropdowns with text in the cloned element
       const dropdowns = clone.querySelectorAll("select");
       dropdowns.forEach((dropdown) => {
         const selectedValue = dropdown.options[dropdown.selectedIndex].text;
@@ -101,37 +88,35 @@ const InvoiceModal = ({ invoice, isModalOpen, handleClose }) => {
         dropdown.parentNode.replaceChild(span, dropdown);
       });
 
-      // Generate PDF
       html2pdf().from(clone).set(options).save();
-    }, 100); // Delay to ensure state is updated
+    }, 100);
   };
 
-  const handlePriceChange = (index, value) => {
+  const handleEditField = (field, index, value) => {
     const newItems = [...editableInvoice.items];
-    newItems[index].price = parseFloat(value);
+    newItems[index][field] = value;
     setEditableInvoice((prev) => ({
       ...prev,
       items: newItems,
     }));
-    updateTotalPrice();
+    updateTotalPrice(); // Recalculate total
   };
 
   const handleBlur = () => {
     if (editingIndex !== null) {
-      handlePriceChange(editingIndex, inputValue);
+      handleEditField(editField, editingIndex, inputValue);
       setEditingIndex(null); // Hide input field
+      setEditField(null);
     }
   };
 
   return (
     <Dialog open={isModalOpen} onClose={handleClose} maxWidth="md" fullWidth>
       <DialogContent>
-        {/* Wrapping the entire invoice content */}
         <div
           ref={invoiceRef}
           style={{ paddingLeft: "50px", paddingRight: "50px" }}
         >
-          {/* Header */}
           <div
             style={{
               display: "flex",
@@ -160,9 +145,8 @@ const InvoiceModal = ({ invoice, isModalOpen, handleClose }) => {
             }}
           >
             <div style={{ width: "45%" }}>
-              <strong>Bill From:</strong>{" "}
-              <strong style={{ fontSize: 18 }}>Central Kitchen,</strong> UNIT 5,
-              152 High Street, Hounslow , TW3 1LR
+              <strong>Bill From:</strong> Central Kitchen, UNIT 5, 152 High
+              Street, Hounslow , TW3 1LR
             </div>
           </div>
 
@@ -219,52 +203,170 @@ const InvoiceModal = ({ invoice, isModalOpen, handleClose }) => {
                 <TableRow>
                   <TableCell>Title</TableCell>
                   <TableCell>Brand</TableCell>
-                  <TableCell>Price/unit</TableCell>
+                  <TableCell>Price (£/unit)</TableCell>
                   <TableCell>Quantity</TableCell>
                   <TableCell>Units</TableCell>
-                  <TableCell>Total</TableCell>
+                  <TableCell>Total (£)</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {editableInvoice.items.map((item, index) => (
                   <TableRow key={index}>
-                    <TableCell>{item.title}</TableCell>
-                    <TableCell>{item.brand}</TableCell>
+                    {/* Editable Title */}
                     <TableCell>
-                      {editingIndex === index ? (
+                      {editingIndex === index && editField === "title" ? (
                         <TextField
                           autoFocus
                           value={inputValue}
                           onChange={(e) => setInputValue(e.target.value)}
                           onBlur={handleBlur}
-                          onFocus={() => setInputValue(item.price)}
-                          type="number"
                           size="small"
                           variant="outlined"
                         />
                       ) : (
                         <>
-                          {item.price}
+                          {item.title}
                           <IconButton
                             size="small"
                             className="edit-icon"
-                            onClick={() => setEditingIndex(index)}
+                            onClick={() => {
+                              setEditingIndex(index);
+                              setEditField("title");
+                              setInputValue(item.title);
+                            }}
                           >
                             <EditIcon fontSize="small" />
                           </IconButton>
                         </>
                       )}
                     </TableCell>
-                    <TableCell>{item.quantity}</TableCell>
-                    <TableCell>{item.units}</TableCell>
-                    <TableCell>{item.price * item.quantity}</TableCell>
+
+                    {/* Editable Brand */}
+                    <TableCell>
+                      {editingIndex === index && editField === "brand" ? (
+                        <TextField
+                          autoFocus
+                          value={inputValue}
+                          onChange={(e) => setInputValue(e.target.value)}
+                          onBlur={handleBlur}
+                          size="small"
+                          variant="outlined"
+                        />
+                      ) : (
+                        <>
+                          {item.brand}
+                          <IconButton
+                            size="small"
+                            className="edit-icon"
+                            onClick={() => {
+                              setEditingIndex(index);
+                              setEditField("brand");
+                              setInputValue(item.brand);
+                            }}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </>
+                      )}
+                    </TableCell>
+
+                    {/* Editable Price */}
+                    <TableCell>
+                      {editingIndex === index && editField === "price" ? (
+                        <TextField
+                          autoFocus
+                          value={inputValue}
+                          onChange={(e) => setInputValue(e.target.value)}
+                          onBlur={handleBlur}
+                          type="number"
+                          size="small"
+                          variant="outlined"
+                        />
+                      ) : (
+                        <>
+                          £{item.price}
+                          <IconButton
+                            size="small"
+                            className="edit-icon"
+                            onClick={() => {
+                              setEditingIndex(index);
+                              setEditField("price");
+                              setInputValue(item.price);
+                            }}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </>
+                      )}
+                    </TableCell>
+
+                    {/* Editable Quantity */}
+                    <TableCell>
+                      {editingIndex === index && editField === "quantity" ? (
+                        <TextField
+                          autoFocus
+                          value={inputValue}
+                          onChange={(e) => setInputValue(e.target.value)}
+                          onBlur={handleBlur}
+                          type="number"
+                          size="small"
+                          variant="outlined"
+                        />
+                      ) : (
+                        <>
+                          {item.quantity}
+                          <IconButton
+                            size="small"
+                            className="edit-icon"
+                            onClick={() => {
+                              setEditingIndex(index);
+                              setEditField("quantity");
+                              setInputValue(item.quantity);
+                            }}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </>
+                      )}
+                    </TableCell>
+
+                    {/* Editable Units */}
+                    <TableCell>
+                      {editingIndex === index && editField === "units" ? (
+                        <TextField
+                          autoFocus
+                          value={inputValue}
+                          onChange={(e) => setInputValue(e.target.value)}
+                          onBlur={handleBlur}
+                          size="small"
+                          variant="outlined"
+                        />
+                      ) : (
+                        <>
+                          {item.units}
+                          <IconButton
+                            size="small"
+                            className="edit-icon"
+                            onClick={() => {
+                              setEditingIndex(index);
+                              setEditField("units");
+                              setInputValue(item.units);
+                            }}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </>
+                      )}
+                    </TableCell>
+
+                    {/* Item Total Price */}
+                    <TableCell>£{item.price * item.quantity}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </TableContainer>
-
-          {/* Order and Payment Status */}
+          {/* Order and Payment Status Dropdowns */}
           {showDropdown ? (
             <div
               style={{
@@ -286,6 +388,7 @@ const InvoiceModal = ({ invoice, isModalOpen, handleClose }) => {
                 display: "flex",
                 justifyContent: "space-between",
                 marginTop: "16px",
+                width: "100%",
               }}
             >
               <FormControl fullWidth>
@@ -293,18 +396,24 @@ const InvoiceModal = ({ invoice, isModalOpen, handleClose }) => {
                 <Select
                   labelId="order-status-label"
                   value={editableInvoice.orderStatus}
-                  onChange={(e) => handleStatusChange("orderStatus", e.target.value)}
+                  onChange={(e) =>
+                    handleStatusChange("orderStatus", e.target.value)
+                  }
                 >
                   <MenuItem value="Pending">Pending</MenuItem>
                   <MenuItem value="Completed">Completed</MenuItem>
                 </Select>
               </FormControl>
               <FormControl fullWidth>
-                <InputLabel id="payment-status-label">Payment Status</InputLabel>
+                <InputLabel id="payment-status-label">
+                  Payment Status
+                </InputLabel>
                 <Select
                   labelId="payment-status-label"
                   value={editableInvoice.paymentStatus}
-                  onChange={(e) => handleStatusChange("paymentStatus", e.target.value)}
+                  onChange={(e) =>
+                    handleStatusChange("paymentStatus", e.target.value)
+                  }
                 >
                   <MenuItem value="Unpaid">Unpaid</MenuItem>
                   <MenuItem value="Paid">Paid</MenuItem>
@@ -312,6 +421,8 @@ const InvoiceModal = ({ invoice, isModalOpen, handleClose }) => {
               </FormControl>
             </div>
           )}
+
+          {/* Total Items */}
           <div
             style={{
               display: "flex",
@@ -323,14 +434,15 @@ const InvoiceModal = ({ invoice, isModalOpen, handleClose }) => {
             }}
           >
             <div>Total Items:</div>
-            <div>${editableInvoice.totalPrice.toFixed(2)}</div>
+            <div>£{editableInvoice.totalPrice.toFixed(2)}</div>
           </div>
         </div>
       </DialogContent>
+
       <DialogActions>
-        <Button onClick={handleClose}>Close</Button>
         <Button onClick={handleSave}>Save</Button>
         <Button onClick={handleSendInvoice}>Send Invoice</Button>
+        <Button onClick={handleClose}>Close</Button>
       </DialogActions>
     </Dialog>
   );
