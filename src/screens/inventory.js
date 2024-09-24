@@ -23,8 +23,15 @@ import {
   query,
   where,
   getDocs,
+  deleteDoc,
 } from "firebase/firestore";
 import { Timestamp } from "firebase/firestore"; // Import Timestamp
+import { Delete } from "@mui/icons-material";
+import Dialog from "@mui/material/Dialog";
+import DialogActions from "@mui/material/DialogActions";
+import DialogContent from "@mui/material/DialogContent";
+import DialogContentText from "@mui/material/DialogContentText";
+import DialogTitle from "@mui/material/DialogTitle";
 import { db } from "../firebase-config";
 import AddCategoryModal from "../components/add-category-modal";
 import AddProductModal from "../components/add-product-modal";
@@ -52,6 +59,55 @@ const Inventory = () => {
     totalPrice: 0,
   });
   const [categories, setCategories] = useState([]);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState(null);
+
+  const handleDelete = async () => {
+    if (!itemToDelete) return;
+
+    console.log(`Attempting to delete item with ID: ${itemToDelete.id}`);
+
+    try {
+      // Query Firestore for the document with the specific ID
+      const inventoryQuery = query(
+        collection(db, Collections.INVENTORY_ITEMS),
+        where("id", "==", itemToDelete.id) // Ensure you use the correct field here
+      );
+      const querySnapshot = await getDocs(inventoryQuery);
+
+      // Check if any documents were found
+      if (querySnapshot.empty) {
+        console.error("No document found with the provided ID");
+        setSnackbarMessage("Item not found!");
+        setSnackbarOpen(true);
+        return;
+      }
+
+      // Get the document ID from the query result
+      const docId = querySnapshot.docs[0].id;
+      const itemRef = doc(db, Collections.INVENTORY_ITEMS, docId);
+
+      // Delete the document
+      await deleteDoc(itemRef);
+      console.log("Document deleted successfully!");
+
+      // Update local state to remove the deleted item
+      setProducts((prevProducts) =>
+        prevProducts.filter((product) => product.id !== itemToDelete.id)
+      );
+
+      setSnackbarMessage("Item deleted successfully!");
+      setSnackbarOpen(true);
+      setItemToDelete(null);
+    } catch (error) {
+      console.error("Error deleting document: ", error);
+      setSnackbarMessage("Error deleting item.");
+      setSnackbarOpen(true);
+    } finally {
+      setDeleteConfirmOpen(false);
+    }
+  };
+
   const calculateTotals = (items) => {
     let totalQuantity = 0;
     let totalSold = 0;
@@ -196,7 +252,7 @@ const Inventory = () => {
   };
 
   return (
-    <Box sx={{ backgroundColor: "#FFFAE1", color: "#C70A0A" }}>
+    <Box sx={{ backgroundColor: "#FFFAE1", color: "#C70A0A",width:'100%' }}>
       <Header title="Inventory" />
       <Grid container spacing={3} alignItems="center" mb={3}>
         <Grid item xs={12} md={5} margin={2}>
@@ -234,12 +290,12 @@ const Inventory = () => {
           </Button>
         </Grid>
       </Grid>
-
+      <div style={{ overflowY: "auto", maxHeight: "100%" }}>
       <TableContainer sx={{ maxWidth: "100%", overflowX: "auto" }}>
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell style={{ fontWeight: "bold" }}>
+              <TableCell style={{ fontWeight: "bold" ,minWidth: "150px"}}>
                 <TableSortLabel
                   active={orderBy === "title"}
                   direction={orderBy === "title" ? orderDirection : "asc"}
@@ -248,7 +304,7 @@ const Inventory = () => {
                   Title
                 </TableSortLabel>
               </TableCell>
-              <TableCell style={{ fontWeight: "bold" }}>
+              <TableCell style={{ fontWeight: "bold" ,minWidth: "100px"}}>
                 <TableSortLabel
                   active={orderBy === "brand"}
                   direction={orderBy === "brand" ? orderDirection : "asc"}
@@ -257,7 +313,7 @@ const Inventory = () => {
                   Brand
                 </TableSortLabel>
               </TableCell>
-              <TableCell style={{ fontWeight: "bold" }}>
+              <TableCell style={{ fontWeight: "bold" ,minWidth: "100px"}}>
                 <TableSortLabel
                   active={orderBy === "vendor"}
                   direction={orderBy === "vendor" ? orderDirection : "asc"}
@@ -266,7 +322,7 @@ const Inventory = () => {
                   Vendor
                 </TableSortLabel>
               </TableCell>
-              <TableCell style={{ fontWeight: "bold" }}>
+              <TableCell style={{ fontWeight: "bold",minWidth: "150px" }}>
                 <TableSortLabel
                   active={orderBy === "category"}
                   direction={orderBy === "category" ? orderDirection : "asc"}
@@ -275,7 +331,7 @@ const Inventory = () => {
                   Category
                 </TableSortLabel>
               </TableCell>
-              <TableCell style={{ fontWeight: "bold" }}>
+              <TableCell style={{ fontWeight: "bold",minWidth: "100px" }}>
                 <TableSortLabel
                   active={orderBy === "units"}
                   direction={orderBy === "units" ? orderDirection : "asc"}
@@ -284,7 +340,7 @@ const Inventory = () => {
                   Units
                 </TableSortLabel>
               </TableCell>
-              <TableCell style={{ fontWeight: "bold" }}>
+              <TableCell style={{ fontWeight: "bold",minWidth: "150px" }}>
                 <TableSortLabel
                   active={orderBy === "availableQuantity"}
                   direction={
@@ -295,7 +351,7 @@ const Inventory = () => {
                   Quantity in stock
                 </TableSortLabel>
               </TableCell>
-              <TableCell style={{ fontWeight: "bold" }}>
+              <TableCell style={{ fontWeight: "bold" ,minWidth: "100px"}}>
                 <TableSortLabel
                   active={orderBy === "price"}
                   direction={orderBy === "price" ? orderDirection : "asc"}
@@ -304,7 +360,7 @@ const Inventory = () => {
                   Price per unit
                 </TableSortLabel>
               </TableCell>
-              <TableCell style={{ fontWeight: "bold" }}>
+              <TableCell style={{ fontWeight: "bold",minWidth: "100px" }}>
                 <TableSortLabel
                   active={orderBy === "soldQuantity"}
                   direction={
@@ -315,7 +371,7 @@ const Inventory = () => {
                   Stock out
                 </TableSortLabel>
               </TableCell>
-              <TableCell style={{ fontWeight: "bold" }}>Total Price</TableCell>
+              <TableCell style={{ fontWeight: "bold",minWidth: "100px" }}>Total Price</TableCell>
               <TableCell style={{ fontWeight: "bold" }}>
                 <TableSortLabel
                   active={orderBy === "updatedAt"}
@@ -334,9 +390,146 @@ const Inventory = () => {
             <TableBody>
               {filteredProducts.map((product) => (
                 <TableRow key={product.id}>
-                  <TableCell>{product.title}</TableCell>
-                  <TableCell>{product.brand}</TableCell>
-                  <TableCell>{product.vendor}</TableCell>
+                  <TableCell>
+                    {editingItemId === product.id &&
+                    editingField === "title" ? (
+                      <TextField
+                        value={getInitialValue(product, "title")}
+                        onChange={(e) =>
+                          handleFieldChange(product.id, "title", e.target.value)
+                        }
+                        size="small"
+                        variant="outlined"
+                        type="text"
+                        disabled={loadingField === "title"}
+                      />
+                    ) : (
+                      product.title
+                    )}
+                    {editingItemId === product.id &&
+                    editingField === "title" ? (
+                      <IconButton
+                        color="primary"
+                        onClick={() => handleUpdate(product.id, "title")}
+                        disabled={loadingField === "title"}
+                      >
+                        <Save />
+                      </IconButton>
+                    ) : (
+                      <IconButton
+                        color="primary"
+                        onClick={() => {
+                          setEditingItemId(product.id);
+                          setEditingField("title");
+                          setUpdatedValues((prev) => ({
+                            ...prev,
+                            [product.id]: {
+                              ...prev[product.id],
+                              title: product.title,
+                            },
+                          }));
+                        }}
+                      >
+                        <Edit />
+                      </IconButton>
+                    )}
+                  </TableCell>
+
+                  {/* Editable Brand */}
+                  <TableCell>
+                    {editingItemId === product.id &&
+                    editingField === "brand" ? (
+                      <TextField
+                        value={getInitialValue(product, "brand")}
+                        onChange={(e) =>
+                          handleFieldChange(product.id, "brand", e.target.value)
+                        }
+                        size="small"
+                        variant="outlined"
+                        type="text"
+                        disabled={loadingField === "brand"}
+                      />
+                    ) : (
+                      product.brand
+                    )}
+                    {editingItemId === product.id &&
+                    editingField === "brand" ? (
+                      <IconButton
+                        color="primary"
+                        onClick={() => handleUpdate(product.id, "brand")}
+                        disabled={loadingField === "brand"}
+                      >
+                        <Save />
+                      </IconButton>
+                    ) : (
+                      <IconButton
+                        color="primary"
+                        onClick={() => {
+                          setEditingItemId(product.id);
+                          setEditingField("brand");
+                          setUpdatedValues((prev) => ({
+                            ...prev,
+                            [product.id]: {
+                              ...prev[product.id],
+                              brand: product.brand,
+                            },
+                          }));
+                        }}
+                      >
+                        <Edit />
+                      </IconButton>
+                    )}
+                  </TableCell>
+
+                  {/* Editable Vendor */}
+                  <TableCell>
+                    {editingItemId === product.id &&
+                    editingField === "vendor" ? (
+                      <TextField
+                        value={getInitialValue(product, "vendor")}
+                        onChange={(e) =>
+                          handleFieldChange(
+                            product.id,
+                            "vendor",
+                            e.target.value
+                          )
+                        }
+                        size="small"
+                        variant="outlined"
+                        type="text"
+                        disabled={loadingField === "vendor"}
+                      />
+                    ) : (
+                      product.vendor
+                    )}
+                    {editingItemId === product.id &&
+                    editingField === "vendor" ? (
+                      <IconButton
+                        color="primary"
+                        onClick={() => handleUpdate(product.id, "vendor")}
+                        disabled={loadingField === "vendor"}
+                      >
+                        <Save />
+                      </IconButton>
+                    ) : (
+                      <IconButton
+                        color="primary"
+                        onClick={() => {
+                          setEditingItemId(product.id);
+                          setEditingField("vendor");
+                          setUpdatedValues((prev) => ({
+                            ...prev,
+                            [product.id]: {
+                              ...prev[product.id],
+                              vendor: product.vendor,
+                            },
+                          }));
+                        }}
+                      >
+                        <Edit />
+                      </IconButton>
+                    )}
+                  </TableCell>
                   <TableCell>
                     {categories.find((cat) => cat.id === product.categoryId)
                       ?.category || "N/A"}
@@ -504,6 +697,17 @@ const Inventory = () => {
                       ? new Date(product.createdAt).toLocaleString("en-GB") // Assuming createdAt is in ISO string format
                       : "N/A"}
                   </TableCell>
+                  <TableCell>
+                    <IconButton
+                      color="error"
+                      onClick={async () => {
+                        setItemToDelete(product);
+                        setDeleteConfirmOpen(true); // Open the confirmation dialog
+                      }}
+                    >
+                      <Delete />
+                    </IconButton>
+                  </TableCell>
                 </TableRow>
               ))}
               <TableRow sx={{ backgroundColor: "#FFB500" }}>
@@ -518,11 +722,31 @@ const Inventory = () => {
                 <TableCell>
                   <strong>£ {totals.totalPrice.toFixed(2)}</strong>
                 </TableCell>
+                <TableCell>
+                </TableCell>
               </TableRow>
             </TableBody>
           )}
         </Table>
       </TableContainer>
+        </div>
+      <Dialog
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+      >
+        <DialogTitle>Confirm Delete</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete this item?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteConfirmOpen(false)}>No</Button>
+          <Button onClick={handleDelete} variant="contained" color="error">
+            Yes, Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <AddCategoryModal
         open={addCategoryOpen}

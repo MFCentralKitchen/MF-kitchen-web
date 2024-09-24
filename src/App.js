@@ -21,7 +21,7 @@ const App = () => {
             element={
               <div style={{ display: 'flex' }}>
                 <Sidebar />
-                <main style={{ marginLeft: 250, width: '100%' }}>
+                <main style={{ marginLeft: "17.5%", width: '82.5%' }}>
                   <Routes>
                     <Route path="/add-users" element={<AddUsers />} />
                     <Route path="/inventory" element={<Inventory />} />
