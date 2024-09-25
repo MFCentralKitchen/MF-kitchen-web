@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, onSnapshot , doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase-config";
 import {
   Table,
@@ -14,6 +14,8 @@ import {
   TableContainer,
   Paper,
   useMediaQuery,
+  MenuItem,
+  Select,
 } from "@mui/material";
 import InvoiceModal from "../components/invoice-modal";
 import Header from "../components/header";
@@ -26,6 +28,9 @@ const InvoiceScreen = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
+  const [editingInvoiceId, setEditingInvoiceId] = useState(null);
+  const [orderStatusValue, setOrderStatusValue] = useState(""); // Local state for order status
+  const [paymentStatusValue, setPaymentStatusValue] = useState(""); 
 
   const isMobile = useMediaQuery("(max-width:600px)");
 
@@ -43,6 +48,20 @@ const InvoiceScreen = () => {
     return () => unsubscribe();
   }, []);
 
+  const handleOrderStatusBlur = async (invoiceId) => {
+    if (orderStatusValue) {
+      await handleStatusChange(invoiceId, "orderStatus", orderStatusValue);
+    }
+    setEditingInvoiceId(null); // Exit edit mode
+  };
+  
+  const handlePaymentStatusBlur = async (invoiceId) => {
+    if (paymentStatusValue) {
+      await handleStatusChange(invoiceId, "isBillPaid", paymentStatusValue === "paid");
+    }
+    setEditingInvoiceId(null); // Exit edit mode
+  };
+
   const handleSort = (column) => {
     const direction =
       sortConfig.key === column && sortConfig.direction === "asc"
@@ -55,6 +74,11 @@ const InvoiceScreen = () => {
     });
     setFilteredInvoices(sortedInvoices);
     setSortConfig({ key: column, direction });
+  };
+
+  const handleStatusChange = async (invoiceId, field, newValue) => {
+    const invoiceRef = doc(db, "invoices", invoiceId);
+    await updateDoc(invoiceRef, { [field]: newValue });
   };
 
   const handleSearch = (e) => {
@@ -154,44 +178,82 @@ const InvoiceScreen = () => {
                   <TableCell>{invoice.restaurantName}</TableCell>
                   <TableCell>{invoice.totalPrice}</TableCell>
                   <TableCell>{formatDate(invoice.createdAt)}</TableCell>
+                  {/* Editable Order Status */}
                   <TableCell>
-                    <div
-                      style={{
-                        backgroundColor:
-                          invoice.orderStatus === "pending"
-                            ? "#fdd835"
-                            : invoice.orderStatus === "delivered"
-                            ? "#66bb6a"
-                            : "#ffa726",
-                        borderRadius: "8px",
-                        padding: "4px 8px",
-                        textAlign: "center",
-                        display: "inline-block",
-                        color: "#fff",
-                        fontWeight: "bold",
-                        minWidth: "80px",
-                      }}
-                    >
-                      {invoice.orderStatus}
-                    </div>
+                    {editingInvoiceId === invoice.id ? (
+                      <Select
+                        value={invoice.orderStatus}
+                        onChange={(e) =>
+                          handleStatusChange(invoice.id, "orderStatus", e.target.value)
+                        }
+                        onBlur={() => handleOrderStatusBlur(invoice.id)}
+                        displayEmpty
+                        variant="outlined"
+                        fullWidth
+                      >
+                        <MenuItem value="pending">Pending</MenuItem>
+                        <MenuItem value="accepted">Accepted</MenuItem>
+                        <MenuItem value="shipped">Shipped</MenuItem>
+                        <MenuItem value="delivered">Delivered</MenuItem>
+                      </Select>
+                    ) : (
+                      <div
+                        style={{
+                          backgroundColor:
+                            invoice.orderStatus === "pending"
+                              ? "#fdd835"
+                              : invoice.orderStatus === "delivered"
+                              ? "#66bb6a"
+                              : "#ffa726",
+                          borderRadius: "8px",
+                          padding: "4px 8px",
+                          textAlign: "center",
+                          display: "inline-block",
+                          color: "#fff",
+                          fontWeight: "bold",
+                          minWidth: "80px",
+                          cursor: "pointer",
+                        }}
+                        onClick={() => setEditingInvoiceId(invoice.id)}
+                      >
+                        {invoice.orderStatus}
+                      </div>
+                    )}
                   </TableCell>
+                  {/* Editable Payment Status */}
                   <TableCell>
-                    <div
-                      style={{
-                        backgroundColor: invoice.isBillPaid
-                          ? "#66bb6a"
-                          : "#ef5350",
-                        borderRadius: "8px",
-                        padding: "4px 8px",
-                        textAlign: "center",
-                        display: "inline-block",
-                        color: "#fff",
-                        fontWeight: "bold",
-                        minWidth: "80px",
-                      }}
-                    >
-                      {invoice.isBillPaid ? "Paid" : "Pending"}
-                    </div>
+                    {editingInvoiceId === invoice.id ? (
+                      <Select
+                        value={invoice.isBillPaid ? "paid" : "pending"}
+                        onChange={(e) =>
+                          handleStatusChange(invoice.id, "isBillPaid", e.target.value === "paid")
+                        }
+                        onBlur={() => handlePaymentStatusBlur(invoice.id)}
+                        displayEmpty
+                        variant="outlined"
+                        fullWidth
+                      >
+                        <MenuItem value="paid">Paid</MenuItem>
+                        <MenuItem value="pending">Pending</MenuItem>
+                      </Select>
+                    ) : (
+                      <div
+                        style={{
+                          backgroundColor: invoice.isBillPaid ? "#66bb6a" : "#ef5350",
+                          borderRadius: "8px",
+                          padding: "4px 8px",
+                          textAlign: "center",
+                          display: "inline-block",
+                          color: "#fff",
+                          fontWeight: "bold",
+                          minWidth: "80px",
+                          cursor: "pointer",
+                        }}
+                        onClick={() => setEditingInvoiceId(invoice.id)}
+                      >
+                        {invoice.isBillPaid ? "Paid" : "Pending"}
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Button variant="contained" color="primary" onClick={() => setSelectedInvoice(invoice)}>
