@@ -1,5 +1,5 @@
 import React from 'react';
-import { Drawer, List, ListItem, ListItemIcon, ListItemText } from '@mui/material';
+import { Drawer, List, ListItem, ListItemIcon, ListItemText, useMediaQuery } from '@mui/material';
 import { Link, useLocation } from 'react-router-dom';
 import LOGO from '../assets/MF-CPU-LOGO.png';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
@@ -11,6 +11,7 @@ const Sidebar = () => {
   const location = useLocation(); // Hook to get the current location
 
   const isActive = (path) => location.pathname === path;
+  const isMobile = useMediaQuery("(max-width:600px)");
 
   return (
     <Drawer
@@ -20,7 +21,7 @@ const Sidebar = () => {
       sx={{
         // width: 260,
         flexShrink: 0,
-        '& .MuiDrawer-paper': { width: 260, boxSizing: 'border-box' },
+        '& .MuiDrawer-paper': { width:isMobile? "19%" :"17.5%", boxSizing: 'border-box' },
         '@media (max-width: 600px)': {
           // width: 200,
           '& .MuiDrawer-paper': { },
@@ -28,7 +29,7 @@ const Sidebar = () => {
       }}
     >
       <div style={{ alignContent: 'center', textAlign: 'center', backgroundColor: '#f8f4e1' }}>
-        <img src={LOGO} alt="My Image" style={{ width: "160px", margin: "20px auto", backgroundColor: '#f8f4e1' }} />
+        <img src={LOGO} alt="My Image" style={{ width:isMobile? "70px" : "160px", margin: "20px auto", backgroundColor: '#f8f4e1' }} />
       </div>
       <List sx={{
         padding: '10px',
