@@ -6,6 +6,7 @@ import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import ReceiptIcon from '@mui/icons-material/Receipt';
 import DashboardIcon from '@mui/icons-material/Dashboard';
+import GroupIcon from '@mui/icons-material/Group';
 
 const Sidebar = () => {
   const location = useLocation(); // Hook to get the current location
@@ -109,6 +110,24 @@ const Sidebar = () => {
             <ReceiptIcon sx={{ color: isActive('/invoices') ? '#fff' : '#000' }} />
           </ListItemIcon>
           <ListItemText primary="Invoices" sx={{ color: isActive('/invoices') ? '#fff' : '#000' }} />
+        </ListItem>
+        <ListItem
+          button
+          component={Link}
+          to="/manage-users"
+          sx={{
+            backgroundColor: isActive('/manage-users') ? '#f5b300' : '#f8f4e1',
+            '&:hover': {
+              backgroundColor: isActive('/manage-users') ? '#f5b300' : '#e0e0e0',
+            },
+            borderRadius: '4px',
+            marginBottom: '10px',
+          }}
+        >
+          <ListItemIcon>
+            <GroupIcon sx={{ color: isActive('/manage-users') ? '#fff' : '#000' }} />
+          </ListItemIcon>
+          <ListItemText primary="Manage Users" sx={{ color: isActive('/manage-users') ? '#fff' : '#000' }} />
         </ListItem>
       </List>
     </Drawer>

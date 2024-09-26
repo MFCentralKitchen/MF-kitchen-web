@@ -8,6 +8,7 @@ import Invoices from './screens/invoices';
 import LoginScreen from './screens/login';
 import { AuthContext } from './auth-context'; // Ensure the path is correct
 import Dashboard from './screens/dashboard';
+import ManageUsers from './screens/manage-users';
 
 const App = () => {
   const { isAuthenticated } = useContext(AuthContext);
@@ -28,6 +29,7 @@ const App = () => {
                     <Route path="/inventory" element={<Inventory />} />
                     <Route path="/invoices" element={<Invoices />} />
                     <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/manage-users" element={<ManageUsers />} />
                     {/* Add more routes as needed */}
                   </Routes>
                 </main>

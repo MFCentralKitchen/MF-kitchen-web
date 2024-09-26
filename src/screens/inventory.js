@@ -14,6 +14,8 @@ import {
   Snackbar,
   Grid,
   Box,
+  TablePagination,
+  Pagination,
 } from "@mui/material";
 import {
   collection,
@@ -61,6 +63,10 @@ const Inventory = () => {
   const [categories, setCategories] = useState([]);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(30);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const handleDelete = async () => {
     if (!itemToDelete) return;
@@ -251,8 +257,22 @@ const Inventory = () => {
     return updatedValues[product.id]?.[field] ?? product[field];
   };
 
+  const handlePageChange = (_, newPage) => {
+    setCurrentPage(newPage);
+  };
+
+  const handleRowsPerPageChange = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  const paginatedProducts = filteredProducts.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
   return (
-    <Box sx={{ backgroundColor: "#FFFAE1", color: "#C70A0A",width:'100%' }}>
+    <Box sx={{ backgroundColor: "#FFFAE1", color: "#C70A0A", width: "100%" }}>
       <Header title="Inventory" />
       <Grid container spacing={3} alignItems="center" mb={3}>
         <Grid item xs={12} md={5} margin={2}>
@@ -291,445 +311,487 @@ const Inventory = () => {
         </Grid>
       </Grid>
       <div style={{ overflowY: "auto", maxHeight: "100%" }}>
-      <TableContainer sx={{ maxWidth: "100%", overflowX: "auto" }}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell style={{ fontWeight: "bold" ,minWidth: "150px"}}>
-                <TableSortLabel
-                  active={orderBy === "title"}
-                  direction={orderBy === "title" ? orderDirection : "asc"}
-                  onClick={() => handleSort("title")}
-                >
-                  Title
-                </TableSortLabel>
-              </TableCell>
-              <TableCell style={{ fontWeight: "bold" ,minWidth: "100px"}}>
-                <TableSortLabel
-                  active={orderBy === "brand"}
-                  direction={orderBy === "brand" ? orderDirection : "asc"}
-                  onClick={() => handleSort("brand")}
-                >
-                  Brand
-                </TableSortLabel>
-              </TableCell>
-              <TableCell style={{ fontWeight: "bold" ,minWidth: "100px"}}>
-                <TableSortLabel
-                  active={orderBy === "vendor"}
-                  direction={orderBy === "vendor" ? orderDirection : "asc"}
-                  onClick={() => handleSort("vendor")}
-                >
-                  Vendor
-                </TableSortLabel>
-              </TableCell>
-              <TableCell style={{ fontWeight: "bold",minWidth: "150px" }}>
-                <TableSortLabel
-                  active={orderBy === "category"}
-                  direction={orderBy === "category" ? orderDirection : "asc"}
-                  onClick={() => handleSort("category")}
-                >
-                  Category
-                </TableSortLabel>
-              </TableCell>
-              <TableCell style={{ fontWeight: "bold",minWidth: "100px" }}>
-                <TableSortLabel
-                  active={orderBy === "units"}
-                  direction={orderBy === "units" ? orderDirection : "asc"}
-                  onClick={() => handleSort("units")}
-                >
-                  Units
-                </TableSortLabel>
-              </TableCell>
-              <TableCell style={{ fontWeight: "bold",minWidth: "150px" }}>
-                <TableSortLabel
-                  active={orderBy === "availableQuantity"}
-                  direction={
-                    orderBy === "availableQuantity" ? orderDirection : "asc"
-                  }
-                  onClick={() => handleSort("availableQuantity")}
-                >
-                  Quantity in stock
-                </TableSortLabel>
-              </TableCell>
-              <TableCell style={{ fontWeight: "bold" ,minWidth: "100px"}}>
-                <TableSortLabel
-                  active={orderBy === "price"}
-                  direction={orderBy === "price" ? orderDirection : "asc"}
-                  onClick={() => handleSort("price")}
-                >
-                  Price per unit
-                </TableSortLabel>
-              </TableCell>
-              <TableCell style={{ fontWeight: "bold",minWidth: "100px" }}>
-                <TableSortLabel
-                  active={orderBy === "soldQuantity"}
-                  direction={
-                    orderBy === "soldQuantity" ? orderDirection : "asc"
-                  }
-                  onClick={() => handleSort("soldQuantity")}
-                >
-                  Stock out
-                </TableSortLabel>
-              </TableCell>
-              <TableCell style={{ fontWeight: "bold",minWidth: "100px" }}>Total Price</TableCell>
-              <TableCell style={{ fontWeight: "bold" }}>
-                <TableSortLabel
-                  active={orderBy === "updatedAt"}
-                  direction={orderBy === "updatedAt" ? orderDirection : "asc"}
-                  onClick={() => handleSort("updatedAt")}
-                >
-                  Updated At
-                </TableSortLabel>
-              </TableCell>
-            </TableRow>
-          </TableHead>
-
-          {initialLoading ? (
-            <CircularProgress size={50} />
-          ) : (
-            <TableBody>
-              {filteredProducts.map((product) => (
-                <TableRow key={product.id}>
-                  <TableCell>
-                    {editingItemId === product.id &&
-                    editingField === "title" ? (
-                      <TextField
-                        value={getInitialValue(product, "title")}
-                        onChange={(e) =>
-                          handleFieldChange(product.id, "title", e.target.value)
-                        }
-                        size="small"
-                        variant="outlined"
-                        type="text"
-                        disabled={loadingField === "title"}
-                      />
-                    ) : (
-                      product.title
-                    )}
-                    {editingItemId === product.id &&
-                    editingField === "title" ? (
-                      <IconButton
-                        color="primary"
-                        onClick={() => handleUpdate(product.id, "title")}
-                        disabled={loadingField === "title"}
-                      >
-                        <Save />
-                      </IconButton>
-                    ) : (
-                      <IconButton
-                        color="primary"
-                        onClick={() => {
-                          setEditingItemId(product.id);
-                          setEditingField("title");
-                          setUpdatedValues((prev) => ({
-                            ...prev,
-                            [product.id]: {
-                              ...prev[product.id],
-                              title: product.title,
-                            },
-                          }));
-                        }}
-                      >
-                        <Edit />
-                      </IconButton>
-                    )}
-                  </TableCell>
-
-                  {/* Editable Brand */}
-                  <TableCell>
-                    {editingItemId === product.id &&
-                    editingField === "brand" ? (
-                      <TextField
-                        value={getInitialValue(product, "brand")}
-                        onChange={(e) =>
-                          handleFieldChange(product.id, "brand", e.target.value)
-                        }
-                        size="small"
-                        variant="outlined"
-                        type="text"
-                        disabled={loadingField === "brand"}
-                      />
-                    ) : (
-                      product.brand
-                    )}
-                    {editingItemId === product.id &&
-                    editingField === "brand" ? (
-                      <IconButton
-                        color="primary"
-                        onClick={() => handleUpdate(product.id, "brand")}
-                        disabled={loadingField === "brand"}
-                      >
-                        <Save />
-                      </IconButton>
-                    ) : (
-                      <IconButton
-                        color="primary"
-                        onClick={() => {
-                          setEditingItemId(product.id);
-                          setEditingField("brand");
-                          setUpdatedValues((prev) => ({
-                            ...prev,
-                            [product.id]: {
-                              ...prev[product.id],
-                              brand: product.brand,
-                            },
-                          }));
-                        }}
-                      >
-                        <Edit />
-                      </IconButton>
-                    )}
-                  </TableCell>
-
-                  {/* Editable Vendor */}
-                  <TableCell>
-                    {editingItemId === product.id &&
-                    editingField === "vendor" ? (
-                      <TextField
-                        value={getInitialValue(product, "vendor")}
-                        onChange={(e) =>
-                          handleFieldChange(
-                            product.id,
-                            "vendor",
-                            e.target.value
-                          )
-                        }
-                        size="small"
-                        variant="outlined"
-                        type="text"
-                        disabled={loadingField === "vendor"}
-                      />
-                    ) : (
-                      product.vendor
-                    )}
-                    {editingItemId === product.id &&
-                    editingField === "vendor" ? (
-                      <IconButton
-                        color="primary"
-                        onClick={() => handleUpdate(product.id, "vendor")}
-                        disabled={loadingField === "vendor"}
-                      >
-                        <Save />
-                      </IconButton>
-                    ) : (
-                      <IconButton
-                        color="primary"
-                        onClick={() => {
-                          setEditingItemId(product.id);
-                          setEditingField("vendor");
-                          setUpdatedValues((prev) => ({
-                            ...prev,
-                            [product.id]: {
-                              ...prev[product.id],
-                              vendor: product.vendor,
-                            },
-                          }));
-                        }}
-                      >
-                        <Edit />
-                      </IconButton>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {categories.find((cat) => cat.id === product.categoryId)
-                      ?.category || "N/A"}
-                  </TableCell>
-
-                  {/* Editable Units */}
-                  <TableCell>
-                    {editingItemId === product.id &&
-                    editingField === "units" ? (
-                      <TextField
-                        value={getInitialValue(product, "units")}
-                        onChange={(e) =>
-                          handleFieldChange(product.id, "units", e.target.value)
-                        }
-                        size="small"
-                        variant="outlined"
-                        type="text" // Change type to "text"
-                        disabled={loadingField === "units"}
-                      />
-                    ) : (
-                      product.units
-                    )}
-                    {editingItemId === product.id &&
-                    editingField === "units" ? (
-                      <IconButton
-                        color="primary"
-                        onClick={() => handleUpdate(product.id, "units")}
-                        disabled={loadingField === "units"}
-                      >
-                        <Save />
-                      </IconButton>
-                    ) : (
-                      <IconButton
-                        color="primary"
-                        onClick={() => {
-                          setEditingItemId(product.id);
-                          setEditingField("units");
-                          setUpdatedValues((prev) => ({
-                            ...prev,
-                            [product.id]: {
-                              ...prev[product.id],
-                              units: product.units,
-                            },
-                          }));
-                        }}
-                      >
-                        <Edit />
-                      </IconButton>
-                    )}
-                  </TableCell>
-
-                  {/* Editable Quantity in Stock */}
-                  <TableCell>
-                    {editingItemId === product.id &&
-                    editingField === "availableQuantity" ? (
-                      <TextField
-                        value={getInitialValue(product, "availableQuantity")}
-                        onChange={(e) =>
-                          handleFieldChange(
-                            product.id,
-                            "availableQuantity",
-                            e.target.value
-                          )
-                        }
-                        size="small"
-                        variant="outlined"
-                        type="number"
-                        disabled={loadingField === "availableQuantity"}
-                      />
-                    ) : (
-                      product.availableQuantity
-                    )}
-                    {editingItemId === product.id &&
-                    editingField === "availableQuantity" ? (
-                      <IconButton
-                        color="primary"
-                        onClick={() =>
-                          handleUpdate(product.id, "availableQuantity")
-                        }
-                        disabled={loadingField === "availableQuantity"}
-                      >
-                        <Save />
-                      </IconButton>
-                    ) : (
-                      <IconButton
-                        color="primary"
-                        onClick={() => {
-                          setEditingItemId(product.id);
-                          setEditingField("availableQuantity");
-                          setUpdatedValues((prev) => ({
-                            ...prev,
-                            [product.id]: {
-                              ...prev[product.id],
-                              availableQuantity: product.availableQuantity,
-                            },
-                          }));
-                        }}
-                      >
-                        <Edit />
-                      </IconButton>
-                    )}
-                  </TableCell>
-
-                  {/* Editable Price */}
-                  <TableCell>
-                    {editingItemId === product.id &&
-                    editingField === "price" ? (
-                      <TextField
-                        value={getInitialValue(product, "price")}
-                        onChange={(e) =>
-                          handleFieldChange(product.id, "price", e.target.value)
-                        }
-                        size="small"
-                        variant="outlined"
-                        type="number"
-                        disabled={loadingField === "price"}
-                      />
-                    ) : (
-                      `£ ${product.price}`
-                    )}
-                    {editingItemId === product.id &&
-                    editingField === "price" ? (
-                      <IconButton
-                        color="primary"
-                        onClick={() => handleUpdate(product.id, "price")}
-                        disabled={loadingField === "price"}
-                      >
-                        <Save />
-                      </IconButton>
-                    ) : (
-                      <IconButton
-                        color="primary"
-                        onClick={() => {
-                          setEditingItemId(product.id);
-                          setEditingField("price");
-                          setUpdatedValues((prev) => ({
-                            ...prev,
-                            [product.id]: {
-                              ...prev[product.id],
-                              price: product.price,
-                            },
-                          }));
-                        }}
-                      >
-                        <Edit />
-                      </IconButton>
-                    )}
-                  </TableCell>
-
-                  {/* Stock Out */}
-                  <TableCell>{product.soldQuantity}</TableCell>
-
-                  {/* Total Price */}
-                  <TableCell>
-                    £ {(product.price * product.availableQuantity).toFixed(1)}
-                  </TableCell>
-
-                  {/* Updated At */}
-                  <TableCell>
-                    {product.updatedAt
-                      ? new Date(
-                          product.updatedAt.seconds * 1000
-                        ).toLocaleString("en-GB")
-                      : product.createdAt
-                      ? new Date(product.createdAt).toLocaleString("en-GB") // Assuming createdAt is in ISO string format
-                      : "N/A"}
-                  </TableCell>
-                  <TableCell>
-                    <IconButton
-                      color="error"
-                      onClick={async () => {
-                        setItemToDelete(product);
-                        setDeleteConfirmOpen(true); // Open the confirmation dialog
-                      }}
-                    >
-                      <Delete />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))}
-              <TableRow sx={{ backgroundColor: "#FFB500" }}>
-                <TableCell colSpan={6}></TableCell>
-                <TableCell>
-                  <strong>{totals.totalQuantity}</strong>
+        <TableContainer sx={{ maxWidth: "100%", overflowX: "auto" }}>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell style={{ fontWeight: "bold", minWidth: "150px" }}>
+                  <TableSortLabel
+                    active={orderBy === "title"}
+                    direction={orderBy === "title" ? orderDirection : "asc"}
+                    onClick={() => handleSort("title")}
+                  >
+                    Title
+                  </TableSortLabel>
                 </TableCell>
-                <TableCell>
-                  <strong>{totals.totalSold}</strong>
+                <TableCell style={{ fontWeight: "bold", minWidth: "100px" }}>
+                  <TableSortLabel
+                    active={orderBy === "brand"}
+                    direction={orderBy === "brand" ? orderDirection : "asc"}
+                    onClick={() => handleSort("brand")}
+                  >
+                    Brand
+                  </TableSortLabel>
                 </TableCell>
-                <TableCell></TableCell>
-                <TableCell>
-                  <strong>£ {totals.totalPrice.toFixed(2)}</strong>
+                <TableCell style={{ fontWeight: "bold", minWidth: "100px" }}>
+                  <TableSortLabel
+                    active={orderBy === "vendor"}
+                    direction={orderBy === "vendor" ? orderDirection : "asc"}
+                    onClick={() => handleSort("vendor")}
+                  >
+                    Vendor
+                  </TableSortLabel>
                 </TableCell>
-                <TableCell>
+                <TableCell style={{ fontWeight: "bold", minWidth: "150px" }}>
+                  <TableSortLabel
+                    active={orderBy === "category"}
+                    direction={orderBy === "category" ? orderDirection : "asc"}
+                    onClick={() => handleSort("category")}
+                  >
+                    Category
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell style={{ fontWeight: "bold", minWidth: "100px" }}>
+                  <TableSortLabel
+                    active={orderBy === "units"}
+                    direction={orderBy === "units" ? orderDirection : "asc"}
+                    onClick={() => handleSort("units")}
+                  >
+                    Units
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell style={{ fontWeight: "bold", minWidth: "150px" }}>
+                  <TableSortLabel
+                    active={orderBy === "availableQuantity"}
+                    direction={
+                      orderBy === "availableQuantity" ? orderDirection : "asc"
+                    }
+                    onClick={() => handleSort("availableQuantity")}
+                  >
+                    Quantity in stock
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell style={{ fontWeight: "bold", minWidth: "100px" }}>
+                  <TableSortLabel
+                    active={orderBy === "price"}
+                    direction={orderBy === "price" ? orderDirection : "asc"}
+                    onClick={() => handleSort("price")}
+                  >
+                    Price per unit
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell style={{ fontWeight: "bold", minWidth: "100px" }}>
+                  <TableSortLabel
+                    active={orderBy === "soldQuantity"}
+                    direction={
+                      orderBy === "soldQuantity" ? orderDirection : "asc"
+                    }
+                    onClick={() => handleSort("soldQuantity")}
+                  >
+                    Stock out
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell style={{ fontWeight: "bold", minWidth: "100px" }}>
+                  Total Price
+                </TableCell>
+                <TableCell style={{ fontWeight: "bold" }}>
+                  <TableSortLabel
+                    active={orderBy === "updatedAt"}
+                    direction={orderBy === "updatedAt" ? orderDirection : "asc"}
+                    onClick={() => handleSort("updatedAt")}
+                  >
+                    Updated At
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell style={{ fontWeight: "bold" }}>
+                    Action
                 </TableCell>
               </TableRow>
-            </TableBody>
-          )}
-        </Table>
-      </TableContainer>
-        </div>
+            </TableHead>
+
+            {initialLoading ? (
+              <CircularProgress size={50} />
+            ) : (
+              <TableBody>
+                {paginatedProducts.map((product) => (
+                  <TableRow key={product.id}>
+                    <TableCell>
+                      {editingItemId === product.id &&
+                      editingField === "title" ? (
+                        <TextField
+                          value={getInitialValue(product, "title")}
+                          onChange={(e) =>
+                            handleFieldChange(
+                              product.id,
+                              "title",
+                              e.target.value
+                            )
+                          }
+                          size="small"
+                          variant="outlined"
+                          type="text"
+                          disabled={loadingField === "title"}
+                        />
+                      ) : (
+                        product.title
+                      )}
+                      {editingItemId === product.id &&
+                      editingField === "title" ? (
+                        <IconButton
+                          color="primary"
+                          onClick={() => handleUpdate(product.id, "title")}
+                          disabled={loadingField === "title"}
+                        >
+                          <Save />
+                        </IconButton>
+                      ) : (
+                        <IconButton
+                          color="primary"
+                          onClick={() => {
+                            setEditingItemId(product.id);
+                            setEditingField("title");
+                            setUpdatedValues((prev) => ({
+                              ...prev,
+                              [product.id]: {
+                                ...prev[product.id],
+                                title: product.title,
+                              },
+                            }));
+                          }}
+                        >
+                          <Edit />
+                        </IconButton>
+                      )}
+                    </TableCell>
+
+                    {/* Editable Brand */}
+                    <TableCell>
+                      {editingItemId === product.id &&
+                      editingField === "brand" ? (
+                        <TextField
+                          value={getInitialValue(product, "brand")}
+                          onChange={(e) =>
+                            handleFieldChange(
+                              product.id,
+                              "brand",
+                              e.target.value
+                            )
+                          }
+                          size="small"
+                          variant="outlined"
+                          type="text"
+                          disabled={loadingField === "brand"}
+                        />
+                      ) : (
+                        product.brand
+                      )}
+                      {editingItemId === product.id &&
+                      editingField === "brand" ? (
+                        <IconButton
+                          color="primary"
+                          onClick={() => handleUpdate(product.id, "brand")}
+                          disabled={loadingField === "brand"}
+                        >
+                          <Save />
+                        </IconButton>
+                      ) : (
+                        <IconButton
+                          color="primary"
+                          onClick={() => {
+                            setEditingItemId(product.id);
+                            setEditingField("brand");
+                            setUpdatedValues((prev) => ({
+                              ...prev,
+                              [product.id]: {
+                                ...prev[product.id],
+                                brand: product.brand,
+                              },
+                            }));
+                          }}
+                        >
+                          <Edit />
+                        </IconButton>
+                      )}
+                    </TableCell>
+
+                    {/* Editable Vendor */}
+                    <TableCell>
+                      {editingItemId === product.id &&
+                      editingField === "vendor" ? (
+                        <TextField
+                          value={getInitialValue(product, "vendor")}
+                          onChange={(e) =>
+                            handleFieldChange(
+                              product.id,
+                              "vendor",
+                              e.target.value
+                            )
+                          }
+                          size="small"
+                          variant="outlined"
+                          type="text"
+                          disabled={loadingField === "vendor"}
+                        />
+                      ) : (
+                        product.vendor
+                      )}
+                      {editingItemId === product.id &&
+                      editingField === "vendor" ? (
+                        <IconButton
+                          color="primary"
+                          onClick={() => handleUpdate(product.id, "vendor")}
+                          disabled={loadingField === "vendor"}
+                        >
+                          <Save />
+                        </IconButton>
+                      ) : (
+                        <IconButton
+                          color="primary"
+                          onClick={() => {
+                            setEditingItemId(product.id);
+                            setEditingField("vendor");
+                            setUpdatedValues((prev) => ({
+                              ...prev,
+                              [product.id]: {
+                                ...prev[product.id],
+                                vendor: product.vendor,
+                              },
+                            }));
+                          }}
+                        >
+                          <Edit />
+                        </IconButton>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {categories.find((cat) => cat.id === product.categoryId)
+                        ?.category || "N/A"}
+                    </TableCell>
+
+                    {/* Editable Units */}
+                    <TableCell>
+                      {editingItemId === product.id &&
+                      editingField === "units" ? (
+                        <TextField
+                          value={getInitialValue(product, "units")}
+                          onChange={(e) =>
+                            handleFieldChange(
+                              product.id,
+                              "units",
+                              e.target.value
+                            )
+                          }
+                          size="small"
+                          variant="outlined"
+                          type="text" // Change type to "text"
+                          disabled={loadingField === "units"}
+                        />
+                      ) : (
+                        product.units
+                      )}
+                      {editingItemId === product.id &&
+                      editingField === "units" ? (
+                        <IconButton
+                          color="primary"
+                          onClick={() => handleUpdate(product.id, "units")}
+                          disabled={loadingField === "units"}
+                        >
+                          <Save />
+                        </IconButton>
+                      ) : (
+                        <IconButton
+                          color="primary"
+                          onClick={() => {
+                            setEditingItemId(product.id);
+                            setEditingField("units");
+                            setUpdatedValues((prev) => ({
+                              ...prev,
+                              [product.id]: {
+                                ...prev[product.id],
+                                units: product.units,
+                              },
+                            }));
+                          }}
+                        >
+                          <Edit />
+                        </IconButton>
+                      )}
+                    </TableCell>
+
+                    {/* Editable Quantity in Stock */}
+                    <TableCell>
+                      {editingItemId === product.id &&
+                      editingField === "availableQuantity" ? (
+                        <TextField
+                          value={getInitialValue(product, "availableQuantity")}
+                          onChange={(e) =>
+                            handleFieldChange(
+                              product.id,
+                              "availableQuantity",
+                              e.target.value
+                            )
+                          }
+                          size="small"
+                          variant="outlined"
+                          type="number"
+                          disabled={loadingField === "availableQuantity"}
+                        />
+                      ) : (
+                        product.availableQuantity
+                      )}
+                      {editingItemId === product.id &&
+                      editingField === "availableQuantity" ? (
+                        <IconButton
+                          color="primary"
+                          onClick={() =>
+                            handleUpdate(product.id, "availableQuantity")
+                          }
+                          disabled={loadingField === "availableQuantity"}
+                        >
+                          <Save />
+                        </IconButton>
+                      ) : (
+                        <IconButton
+                          color="primary"
+                          onClick={() => {
+                            setEditingItemId(product.id);
+                            setEditingField("availableQuantity");
+                            setUpdatedValues((prev) => ({
+                              ...prev,
+                              [product.id]: {
+                                ...prev[product.id],
+                                availableQuantity: product.availableQuantity,
+                              },
+                            }));
+                          }}
+                        >
+                          <Edit />
+                        </IconButton>
+                      )}
+                    </TableCell>
+
+                    {/* Editable Price */}
+                    <TableCell>
+                      {editingItemId === product.id &&
+                      editingField === "price" ? (
+                        <TextField
+                          value={getInitialValue(product, "price")}
+                          onChange={(e) =>
+                            handleFieldChange(
+                              product.id,
+                              "price",
+                              e.target.value
+                            )
+                          }
+                          size="small"
+                          variant="outlined"
+                          type="number"
+                          disabled={loadingField === "price"}
+                        />
+                      ) : (
+                        `£ ${product.price}`
+                      )}
+                      {editingItemId === product.id &&
+                      editingField === "price" ? (
+                        <IconButton
+                          color="primary"
+                          onClick={() => handleUpdate(product.id, "price")}
+                          disabled={loadingField === "price"}
+                        >
+                          <Save />
+                        </IconButton>
+                      ) : (
+                        <IconButton
+                          color="primary"
+                          onClick={() => {
+                            setEditingItemId(product.id);
+                            setEditingField("price");
+                            setUpdatedValues((prev) => ({
+                              ...prev,
+                              [product.id]: {
+                                ...prev[product.id],
+                                price: product.price,
+                              },
+                            }));
+                          }}
+                        >
+                          <Edit />
+                        </IconButton>
+                      )}
+                    </TableCell>
+
+                    {/* Stock Out */}
+                    <TableCell>{product.soldQuantity}</TableCell>
+
+                    {/* Total Price */}
+                    <TableCell>
+                      £ {(product.price * product.availableQuantity).toFixed(1)}
+                    </TableCell>
+
+                    {/* Updated At */}
+                    <TableCell>
+                      {product.updatedAt
+                        ? new Date(
+                            product.updatedAt.seconds * 1000
+                          ).toLocaleString("en-GB")
+                        : product.createdAt
+                        ? new Date(product.createdAt).toLocaleString("en-GB") // Assuming createdAt is in ISO string format
+                        : "N/A"}
+                    </TableCell>
+                    <TableCell>
+                      <IconButton
+                        color="error"
+                        onClick={async () => {
+                          setItemToDelete(product);
+                          setDeleteConfirmOpen(true); // Open the confirmation dialog
+                        }}
+                      >
+                        <Delete />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                <TableRow
+                  sx={{
+                    backgroundColor: "#FFB500",
+                    position: "sticky",
+                    bottom: 0,
+                    zIndex: 10,
+                  }}
+                >
+                  <TableCell colSpan={6}></TableCell>
+                  <TableCell>
+                    <strong>{totals.totalQuantity}</strong>
+                  </TableCell>
+                  <TableCell>
+                    <strong>{totals.totalSold}</strong>
+                  </TableCell>
+                  <TableCell></TableCell>
+                  <TableCell>
+                    <strong>£ {totals.totalPrice.toFixed(2)}</strong>
+                  </TableCell>
+                  <TableCell></TableCell>
+                </TableRow>
+              </TableBody>
+            )}
+          </Table>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              marginTop: 2,
+            }}
+          >
+            <Pagination
+              count={Math.ceil(filteredProducts.length / itemsPerPage)}
+              page={currentPage}
+              onChange={handlePageChange}
+              color="primary"
+            />
+          </Box>
+        </TableContainer>
+      </div>
       <Dialog
         open={deleteConfirmOpen}
         onClose={() => setDeleteConfirmOpen(false)}
