@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Modal, Box, TextField, Button, CircularProgress } from '@mui/material';
-import { collection, addDoc, query, where, getDocs, doc, setDoc } from 'firebase/firestore';
-import { db } from '../firebase-config';
+import { collection, query, where, getDocs, doc, setDoc } from 'firebase/firestore';
+import { db, storage } from '../firebase-config'; // Import storage from firebase-config
 import Collections from '../collections';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const AddCategoryModal = ({ open, onClose }) => {
   const [category, setCategory] = useState('');
@@ -23,14 +24,16 @@ const AddCategoryModal = ({ open, onClose }) => {
     }
   };
 
+  
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!category || !image) {
       setError('Please provide a category name and upload an image');
       return;
     }
-  
+
     setLoading(true);
     try {
       // Query to check if the category already exists
@@ -38,26 +41,33 @@ const AddCategoryModal = ({ open, onClose }) => {
         collection(db, Collections.INVENTORY_CATEGORY),
         where('category', '==', category)
       );
-      
+
       const querySnapshot = await getDocs(categoryQuery);
-  
+
       if (!querySnapshot.empty) {
-        // Category already exists, show an error or update if needed
         setError('Category already exists. Please choose a different name.');
       } else {
         // If category doesn't exist, proceed to add it
         const newDocRef = doc(collection(db, Collections.INVENTORY_CATEGORY)); // Generate doc ref
-  
+
+        // Upload image to Firebase Storage
+        const imageRef = ref(storage, `categories/${newDocRef.id}.jpg`); // Use appropriate naming convention
+        await uploadBytes(imageRef, image); // Upload the image file
+
+        // Get download URL
+        const downloadURL = await getDownloadURL(imageRef);
+
         const categoryData = {
           id: newDocRef.id, // Add the generated ID to the data
           category,
-          image: URL.createObjectURL(image), // Placeholder for the image URL before Firebase Storage integration
+          image: downloadURL, // Store the HTTP URL of the image
           createdAt: new Date().toISOString(),
         };
-  
+
         await setDoc(newDocRef, categoryData); // Set the doc with custom ID and data
-  
-        setCategory('');  // Reset form fields
+
+        // Reset form fields
+        setCategory('');
         setImage(null);
         setImagePreview(null); // Clear image preview
         setError('');
@@ -70,7 +80,6 @@ const AddCategoryModal = ({ open, onClose }) => {
       setLoading(false);
     }
   };
-  
 
   return (
     <Modal open={open} onClose={onClose}>
