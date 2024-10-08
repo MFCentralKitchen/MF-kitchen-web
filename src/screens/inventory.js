@@ -16,6 +16,7 @@ import {
   Box,
   TablePagination,
   Pagination,
+  MenuItem,
 } from "@mui/material";
 import {
   collection,
@@ -118,15 +119,30 @@ const Inventory = () => {
     let totalQuantity = 0;
     let totalSold = 0;
     let totalPrice = 0;
-
+  
     items.forEach((product) => {
-      totalQuantity += product.availableQuantity || 0;
-      totalSold += product.soldQuantity || 0;
-      totalPrice += product.availableQuantity * product.price || 0;
+      // Convert availableQuantity and soldQuantity to numbers and skip if invalid
+      const availableQuantity = Number(product.availableQuantity);
+      const soldQuantity = Number(product.soldQuantity);
+      const price = Number(product.price);
+  
+      if (!isNaN(availableQuantity)) {
+        totalQuantity += availableQuantity;
+      }
+  
+      if (!isNaN(soldQuantity)) {
+        totalSold += soldQuantity;
+      }
+  
+      // Only add to totalPrice if both availableQuantity and price are valid numbers
+      if (!isNaN(availableQuantity) && !isNaN(price)) {
+        totalPrice += availableQuantity * price;
+      }
     });
-
+  
     setTotals({ totalQuantity, totalSold, totalPrice });
   };
+  
 
   useEffect(() => {
     setInitialLoading(true);
@@ -342,7 +358,7 @@ const Inventory = () => {
                     Vendor
                   </TableSortLabel>
                 </TableCell>
-                <TableCell style={{ fontWeight: "bold", minWidth: "150px" }}>
+                <TableCell style={{ fontWeight: "bold", minWidth: "200px" }}>
                   <TableSortLabel
                     active={orderBy === "category"}
                     direction={orderBy === "category" ? orderDirection : "asc"}
@@ -403,9 +419,7 @@ const Inventory = () => {
                     Updated At
                   </TableSortLabel>
                 </TableCell>
-                <TableCell style={{ fontWeight: "bold" }}>
-                    Action
-                </TableCell>
+                <TableCell style={{ fontWeight: "bold" }}>Action</TableCell>
               </TableRow>
             </TableHead>
 
@@ -564,8 +578,63 @@ const Inventory = () => {
                       )}
                     </TableCell>
                     <TableCell>
-                      {categories.find((cat) => cat.id === product.categoryId)
-                        ?.category || "N/A"}
+                      {editingItemId === product.id &&
+                      editingField === "category" ? (
+                        <TextField
+                          select
+                          value={
+                            updatedValues[product.id]?.categoryId ||
+                            product.categoryId
+                          } // Set default by categoryId
+                          onChange={(e) =>
+                            handleFieldChange(
+                              product.id,
+                              "categoryId",
+                              e.target.value
+                            )
+                          }
+                          size="small"
+                          variant="outlined"
+                          disabled={loadingField === "category"}
+                        >
+                          {/* Map through your categories here */}
+                          {categories.map((cat) => (
+                            <MenuItem key={cat.id} value={cat.id}>
+                              {cat.category}
+                            </MenuItem>
+                          ))}
+                        </TextField>
+                      ) : (
+                        categories.find((cat) => cat.id === product.categoryId)
+                          ?.category || "N/A"
+                      )}
+                      {editingItemId === product.id &&
+                      editingField === "category" ? (
+                        <IconButton
+                          color="primary"
+                          onClick={() => handleUpdate(product.id, "categoryId")}
+                          disabled={loadingField === "category"}
+                        >
+                          <Save />
+                        </IconButton>
+                      ) : (
+                        <IconButton
+                          color="primary"
+                          onClick={() => {
+                            setEditingItemId(product.id);
+                            setEditingField("category");
+                            setUpdatedValues((prev) => ({
+                              ...prev,
+                              [product.id]: {
+                                ...prev[product.id],
+                                categoryId: product.categoryId, // Initialize with current categoryId
+                              },
+                            }));
+                          }}
+                        >
+                          <Edit />
+                        </IconButton>
+                      )}
                     </TableCell>
 
                     {/* Editable Units */}
@@ -759,7 +828,7 @@ const Inventory = () => {
                     zIndex: 10,
                   }}
                 >
-                  <TableCell colSpan={6}></TableCell>
+                  <TableCell colSpan={5}></TableCell>
                   <TableCell>
                     <strong>{totals.totalQuantity}</strong>
                   </TableCell>
@@ -770,6 +839,7 @@ const Inventory = () => {
                   <TableCell>
                     <strong>£ {totals.totalPrice.toFixed(2)}</strong>
                   </TableCell>
+                  <TableCell></TableCell>
                   <TableCell></TableCell>
                 </TableRow>
               </TableBody>
