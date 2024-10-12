@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { db } from "../firebase-config";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
 import {
   Card,
   CardContent,
@@ -26,43 +26,71 @@ const Dashboard = () => {
   const [totalCombined, setTotalCombined] = useState({});
 
   useEffect(() => {
-    const fetchData = async () => {
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      const todayTimestamp = Timestamp.fromDate(todayStart);
+    const todayStart = new Date();
+    todayStart.setUTCHours(0, 0, 0, 0); // Set UTC hours to 00:00:00
+    const todayTimestamp = Timestamp.fromDate(todayStart);
 
-      // Today's Orders
-      const invoicesRef = collection(db, "invoices");
-      const todayInvoicesQuery = query(
-        invoicesRef,
-        where("createdAt", ">=", todayTimestamp)
-      );
-      const todayInvoicesSnapshot = await getDocs(todayInvoicesQuery);
+    // Log for debugging
+    console.log("Today's Start UTC Timestamp:", todayTimestamp);
+    console.log("Today's Start Date:", todayStart.toISOString());
 
+    // Listen to real-time updates with onSnapshot
+    const invoicesRef = collection(db, "invoices");
+
+    const unsubscribe = onSnapshot(invoicesRef, (snapshot) => {
       const ordersCount = {};
-      todayInvoicesSnapshot.forEach((doc) => {
-        const invoice = doc.data();
-        if (!ordersCount[invoice.restaurantName]) {
-          ordersCount[invoice.restaurantName] = 0;
-        }
-        ordersCount[invoice.restaurantName]++;
-      });
 
-      setTodayOrders(ordersCount);
+      if (snapshot.empty) {
+        console.log("No orders found for today.");
+      } else {
+        snapshot.forEach((doc) => {
+          const invoice = doc.data();
 
-      // Total Available Metrics
-      const inventoryRef = collection(db, "inventoryItems");
-      const inventorySnapshot = await getDocs(inventoryRef);
+          // Handle different date formats for createdAt
+          const createdAt = invoice.createdAt;
 
+          let invoiceDate;
+          if (createdAt && createdAt.seconds) {
+            // Firestore Timestamp
+            invoiceDate = new Date(createdAt.seconds * 1000);
+          } else if (typeof createdAt === "string") {
+            // ISO String
+            invoiceDate = new Date(createdAt);
+          }
+
+          // Log for debugging
+          console.log("Invoice data:", invoice);
+          console.log("Formatted Invoice Date:", invoiceDate);
+
+          // Only include invoices from today (UTC)
+          if (invoiceDate && invoiceDate >= todayStart) {
+            if (invoice.restaurantName) {
+              if (!ordersCount[invoice.restaurantName]) {
+                ordersCount[invoice.restaurantName] = 0;
+              }
+              ordersCount[invoice.restaurantName]++;
+            }
+          }
+        });
+
+        setTodayOrders(ordersCount); // Update today's orders
+      }
+    });
+
+    // Clean up listener on unmount
+
+    // Fetch Total Available Metrics
+    const inventoryRef = collection(db, "inventoryItems");
+    const unsubscribeTotalAvailable = onSnapshot(inventoryRef, (snapshot) => {
       let totalAvailableItems = 0;
       let totalAvailableCost = 0;
       let totalAvailableQuantity = 0;
 
-      inventorySnapshot.forEach((doc) => {
+      snapshot.forEach((doc) => {
         const item = doc.data();
         totalAvailableItems += 1;
-        totalAvailableCost += item.price * item.availableQuantity;
-        totalAvailableQuantity += item.availableQuantity;
+        totalAvailableCost += item.price * Number(item.availableQuantity) || 0;
+        totalAvailableQuantity += Number(item.availableQuantity) || 0;
       });
 
       setTotalAvailable({
@@ -70,24 +98,25 @@ const Dashboard = () => {
         cost: totalAvailableCost.toFixed(2),
         quantity: totalAvailableQuantity,
       });
+    });
 
-      // Total Sold Metrics
-      const soldInvoicesQuery = query(
-        invoicesRef,
-        where("createdAt", "<", todayTimestamp)
-      );
-      const soldInvoicesSnapshot = await getDocs(soldInvoicesQuery);
+    // Fetch Total Sold Metrics
+    const soldInvoicesQuery = query(
+      invoicesRef,
+      where("createdAt", "<", todayTimestamp)
+    );
 
+    const unsubscribeTotalSold = onSnapshot(soldInvoicesQuery, (snapshot) => {
       let totalSoldItems = 0;
       let totalSoldCost = 0;
       let totalSoldQuantity = 0;
 
-      soldInvoicesSnapshot.forEach((doc) => {
+      snapshot.forEach((doc) => {
         const invoice = doc.data();
         invoice.items.forEach((item) => {
           totalSoldItems += 1;
-          totalSoldCost += item.price * item.quantity;
-          totalSoldQuantity += item.quantity;
+          totalSoldCost += item.price * Number(item.quantity) || 0;
+          totalSoldQuantity += Number(item.quantity) || 0;
         });
       });
 
@@ -96,17 +125,29 @@ const Dashboard = () => {
         cost: totalSoldCost.toFixed(2),
         quantity: totalSoldQuantity,
       });
+    });
 
-      // Total Combined Metrics
-      setTotalCombined({
-        items: totalAvailableItems + totalSoldItems,
-        cost: (totalAvailableCost + totalSoldCost).toFixed(2),
-        quantity: totalAvailableQuantity + totalSoldQuantity,
-      });
+    // Clean up listeners on unmount
+    return () => {
+      unsubscribe();
+
+      unsubscribeTotalAvailable();
+      unsubscribeTotalSold();
     };
-
-    fetchData();
   }, []);
+
+  // Separate effect for updating total combined when available or sold changes
+  useEffect(() => {
+    const combinedItems = (totalAvailable.items || 0) + (totalSold.items || 0);
+    const combinedCost = (parseFloat(totalAvailable.cost) || 0) + (parseFloat(totalSold.cost) || 0);
+    const combinedQuantity = (totalAvailable.quantity || 0) + (totalSold.quantity || 0);
+
+    setTotalCombined({
+      items: combinedItems,
+      cost: combinedCost.toFixed(2),
+      quantity: combinedQuantity,
+    });
+  }, [totalAvailable, totalSold]);
 
   const styles = {
     card: {
@@ -200,7 +241,7 @@ const Dashboard = () => {
                   <div style={styles.itemRow}>
                     <Typography>Cost:</Typography>
                     <Typography style={{ color: "black" }}>
-                    £ {totalAvailable.cost}
+                      £ {totalAvailable.cost}
                     </Typography>
                   </div>
                   <div style={styles.itemRow}>
@@ -225,15 +266,21 @@ const Dashboard = () => {
                 <div style={styles.cardItemContainer}>
                   <div style={styles.itemRow}>
                     <Typography>Items:</Typography>
-                    <Typography style={{color:'black'}}>{totalSold.items}</Typography>
+                    <Typography style={{ color: "black" }}>
+                      {totalSold.items}
+                    </Typography>
                   </div>
                   <div style={styles.itemRow}>
                     <Typography>Cost:</Typography>
-                    <Typography style={{color:'black'}}>£ {totalSold.cost}</Typography>
+                    <Typography style={{ color: "black" }}>
+                      £ {totalSold.cost}
+                    </Typography>
                   </div>
                   <div style={styles.itemRow}>
                     <Typography>Quantity:</Typography>
-                    <Typography style={{color:'black'}}>{totalSold.quantity}</Typography>
+                    <Typography style={{ color: "black" }}>
+                      {totalSold.quantity}
+                    </Typography>
                   </div>
                 </div>
               </CardContent>
@@ -251,15 +298,21 @@ const Dashboard = () => {
                 <div style={styles.cardItemContainer}>
                   <div style={styles.itemRow}>
                     <Typography>Items:</Typography>
-                    <Typography style={{color:'black'}}>{totalCombined.items}</Typography>
+                    <Typography style={{ color: "black" }}>
+                      {totalCombined.items}
+                    </Typography>
                   </div>
                   <div style={styles.itemRow}>
                     <Typography>Cost:</Typography>
-                    <Typography style={{color:'black'}}>£ {totalCombined.cost}</Typography>
+                    <Typography style={{ color: "black" }}>
+                      £ {totalCombined.cost}
+                    </Typography>
                   </div>
                   <div style={styles.itemRow}>
                     <Typography>Quantity:</Typography>
-                    <Typography style={{color:'black'}}>{totalCombined.quantity}</Typography>
+                    <Typography style={{ color: "black" }}>
+                      {totalCombined.quantity}
+                    </Typography>
                   </div>
                 </div>
               </CardContent>

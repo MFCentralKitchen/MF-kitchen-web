@@ -208,9 +208,13 @@ const Inventory = () => {
     }
   });
 
-  const filteredProducts = sortedProducts.filter((product) =>
-    product.title.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredProducts = products.filter((product) => {
+    const categoryName = categories.find(cat => cat.id === product.categoryId)?.category || '';
+    return (
+      product.title.toLowerCase().includes(searchTerm.toLowerCase()) || // Check product title
+      categoryName.toLowerCase().includes(searchTerm.toLowerCase())     // Check category name
+    );
+  });
 
   const handleFieldChange = (itemId, field, value) => {
     setUpdatedValues((prev) => ({
@@ -294,7 +298,7 @@ const Inventory = () => {
         <Grid item xs={12} md={5} margin={2}>
           <TextField
             fullWidth
-            label="Search Products"
+            label="Search Products by title or category"
             variant="outlined"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -832,10 +836,10 @@ const Inventory = () => {
                   <TableCell>
                     <strong>{totals.totalQuantity}</strong>
                   </TableCell>
+                  <TableCell></TableCell>
                   <TableCell>
                     <strong>{totals.totalSold}</strong>
                   </TableCell>
-                  <TableCell></TableCell>
                   <TableCell>
                     <strong>£ {totals.totalPrice.toFixed(2)}</strong>
                   </TableCell>
