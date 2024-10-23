@@ -60,6 +60,7 @@ const Inventory = () => {
     totalQuantity: 0,
     totalSold: 0,
     totalPrice: 0,
+    totalUnitPrice:0
   });
   const [categories, setCategories] = useState([]);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -119,12 +120,14 @@ const Inventory = () => {
     let totalQuantity = 0;
     let totalSold = 0;
     let totalPrice = 0;
+    let totalUnitPrice = 0;
   
     items.forEach((product) => {
       // Convert availableQuantity and soldQuantity to numbers and skip if invalid
       const availableQuantity = Number(product.availableQuantity);
       const soldQuantity = Number(product.soldQuantity);
       const price = Number(product.price);
+      const pricePerUnit = Number(product.price)
   
       if (!isNaN(availableQuantity)) {
         totalQuantity += availableQuantity;
@@ -133,6 +136,10 @@ const Inventory = () => {
       if (!isNaN(soldQuantity)) {
         totalSold += soldQuantity;
       }
+
+      if(!isNaN(pricePerUnit)){
+        totalUnitPrice+=pricePerUnit
+      }
   
       // Only add to totalPrice if both availableQuantity and price are valid numbers
       if (!isNaN(availableQuantity) && !isNaN(price)) {
@@ -140,7 +147,7 @@ const Inventory = () => {
       }
     });
   
-    setTotals({ totalQuantity, totalSold, totalPrice });
+    setTotals({ totalQuantity, totalSold, totalPrice, totalUnitPrice });
   };
   
 
@@ -836,7 +843,7 @@ const Inventory = () => {
                   <TableCell>
                     <strong>{totals.totalQuantity}</strong>
                   </TableCell>
-                  <TableCell></TableCell>
+                  <TableCell><strong>£ {totals.totalUnitPrice.toFixed(2)}</strong></TableCell>
                   <TableCell>
                     <strong>{totals.totalSold}</strong>
                   </TableCell>

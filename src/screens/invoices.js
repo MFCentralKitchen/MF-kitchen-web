@@ -176,7 +176,7 @@ const InvoiceScreen = () => {
                   <TableCell>{`#${invoice.id}`}</TableCell>
                   <TableCell>{invoice.name}</TableCell>
                   <TableCell>{invoice.restaurantName}</TableCell>
-                  <TableCell>{invoice.totalPrice}</TableCell>
+                  <TableCell>£ {invoice.totalPrice}</TableCell>
                   <TableCell>{formatDate(invoice.createdAt)}</TableCell>
                   {/* Editable Order Status */}
                   <TableCell>
