@@ -133,8 +133,8 @@ const AddCategoryModal = ({ open, onClose }) => {
   return (
     <Modal open={open} onClose={onClose}>
       <Box sx={modalStyle}>
-        <h2>{isEditing ? 'Edit Category' : 'Add Category'}</h2>
-        {!isEditing ? (
+        <h2>{!isEditing ? 'Edit Category' : 'Add Category'}</h2>
+        {isEditing ? (
           <form onSubmit={handleSubmit}>
             <TextField
               label="Category Name"
@@ -166,7 +166,7 @@ const AddCategoryModal = ({ open, onClose }) => {
           </div>
         )}
         <Button onClick={() => setIsEditing(!isEditing)} variant="outlined" style={{ position: 'absolute', top: 16, right: 16 }}>
-          {isEditing ? 'Add Category' : 'Edit Categories'}
+          {!isEditing ? 'Add Category' : 'Edit Categories'}
         </Button>
       </Box>
     </Modal>
