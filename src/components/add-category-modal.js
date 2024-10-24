@@ -112,7 +112,7 @@ const AddCategoryModal = ({ open, onClose }) => {
   };
 
   const handleCancelEdit = () => {
-    setIsEditing(false);
+    setIsEditing(!isEditing);
     setCategory('');
     setImage(null);
     setImagePreview(null);
@@ -154,7 +154,7 @@ const AddCategoryModal = ({ open, onClose }) => {
               <Button type="submit" variant="contained" color="primary" disabled={loading}>
                 {loading ? <CircularProgress size={24} /> : 'Save Changes'}
               </Button>
-              <Button onClick={handleCancelEdit} variant="outlined" color="secondary" style={{ marginLeft: '10px' }}>
+              <Button onClick={onClose} variant="outlined" color="secondary" style={{ marginLeft: '10px' }}>
                 Cancel
               </Button>
             </div>

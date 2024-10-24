@@ -42,6 +42,7 @@ const ManageUsers = () => {
           ...doc.data(),
         }));
         setUsers(usersList);
+        console.log(usersList,"lkkl,","90909009")
       } catch (error) {
         console.error("Error fetching users: ", error);
         setToast({
@@ -113,6 +114,7 @@ const ManageUsers = () => {
               <TableHead>
                 <TableRow sx={{ backgroundColor: "#C70A0A", color: "white" }}>
                   <TableCell sx={{ color: "white", fontWeight: "bold" }}>Name</TableCell>
+                  <TableCell sx={{ color: "white", fontWeight: "bold" }}>Password</TableCell>
                   <TableCell sx={{ color: "white", fontWeight: "bold" }}>Email</TableCell>
                   <TableCell sx={{ color: "white", fontWeight: "bold" }}>Phone</TableCell>
                   <TableCell sx={{ color: "white", fontWeight: "bold" }}>Restaurant Name</TableCell>
@@ -129,6 +131,13 @@ const ManageUsers = () => {
                           <TextField
                             name="name"
                             value={editedUser.name}
+                            onChange={handleChange}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <TextField
+                            name="password"
+                            value={editedUser.password}
                             onChange={handleChange}
                           />
                         </TableCell>
@@ -172,6 +181,7 @@ const ManageUsers = () => {
                     ) : (
                       <>
                         <TableCell>{user.name}</TableCell>
+                        <TableCell>{user.password}</TableCell>
                         <TableCell>{user.email}</TableCell>
                         <TableCell>{user.phone}</TableCell>
                         <TableCell>{user.restaurantName}</TableCell>
