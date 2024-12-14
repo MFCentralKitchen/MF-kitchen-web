@@ -19,7 +19,7 @@ import RestaurantIcon from "@mui/icons-material/Restaurant";
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
 import StoreIcon from "@mui/icons-material/Store";
 import MergeTypeIcon from "@mui/icons-material/MergeType";
-import AttachMoneyIcon from "@mui/icons-material/AttachMoney";
+import AttachMoneyIcon from "@mui/icons-material/CurrencyPound";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 const Dashboard = () => {
@@ -191,6 +191,25 @@ const Dashboard = () => {
     },
   };
 
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="custom-tooltip" style={{ 
+          backgroundColor: 'white', 
+          padding: '10px', 
+          border: '1px solid #ccc',
+          borderRadius: '5px'
+        }}>
+          <p className="label">{`Date: ${label}`}</p>
+          <p className="value">
+            {`Sales: £${payload[0].value.toLocaleString()}`}
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
     <Box sx={{ 
       // backgroundColor: '#f4f6f9', 
@@ -215,18 +234,18 @@ const Dashboard = () => {
               Weekly Sales Trend
             </Typography>
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={salesTrend}>
-                <XAxis dataKey="date" />
-                <YAxis />
-                <Tooltip />
-                <Line 
-                  type="monotone" 
-                  dataKey="sales" 
-                  stroke="#C70039" 
-                  strokeWidth={3}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+        <LineChart data={salesTrend}>
+          <XAxis dataKey="date" />
+          <YAxis />
+          <Tooltip content={<CustomTooltip />} />
+          <Line 
+            type="monotone" 
+            dataKey="sales" 
+            stroke="#C70039" 
+            strokeWidth={3}
+          />
+        </LineChart>
+      </ResponsiveContainer>
           </Paper>
         </Grid>
 
