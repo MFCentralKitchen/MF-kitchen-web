@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { db } from "../firebase-config";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { collection, query, onSnapshot } from "firebase/firestore";
 import {
   Card,
   CardContent,
@@ -11,75 +11,95 @@ import {
   TableCell,
   TableHead,
   TableRow,
+  Box,
+  Paper,
 } from "@mui/material";
 import Header from "../components/header";
 import RestaurantIcon from "@mui/icons-material/Restaurant";
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
 import StoreIcon from "@mui/icons-material/Store";
 import MergeTypeIcon from "@mui/icons-material/MergeType";
-import { Timestamp } from "firebase/firestore";
+import AttachMoneyIcon from "@mui/icons-material/AttachMoney";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 const Dashboard = () => {
   const [todayOrders, setTodayOrders] = useState({});
   const [totalAvailable, setTotalAvailable] = useState({});
   const [totalSold, setTotalSold] = useState({});
   const [totalCombined, setTotalCombined] = useState({});
+  const [salesTrend, setSalesTrend] = useState([]);
 
   useEffect(() => {
     const todayStart = new Date();
-    todayStart.setUTCHours(0, 0, 0, 0); // Set UTC hours to 00:00:00
-    const todayTimestamp = Timestamp.fromDate(todayStart);
+    todayStart.setUTCHours(0, 0, 0, 0);
 
-    // Log for debugging
-    console.log("Today's Start UTC Timestamp:", todayTimestamp);
-    console.log("Today's Start Date:", todayStart.toISOString());
-
-    // Listen to real-time updates with onSnapshot
     const invoicesRef = collection(db, "invoices");
 
-    const unsubscribe = onSnapshot(invoicesRef, (snapshot) => {
+    // Orders Listener
+    const unsubscribeOrders = onSnapshot(invoicesRef, (snapshot) => {
       const ordersCount = {};
+      const salesData = [];
 
-      if (snapshot.empty) {
-        console.log("No orders found for today.");
-      } else {
+      if (!snapshot.empty) {
         snapshot.forEach((doc) => {
           const invoice = doc.data();
-
-          // Handle different date formats for createdAt
           const createdAt = invoice.createdAt;
-
           let invoiceDate;
+
           if (createdAt && createdAt.seconds) {
-            // Firestore Timestamp
             invoiceDate = new Date(createdAt.seconds * 1000);
           } else if (typeof createdAt === "string") {
-            // ISO String
             invoiceDate = new Date(createdAt);
           }
 
-          // Log for debugging
-          console.log("Invoice data:", invoice);
-          console.log("Formatted Invoice Date:", invoiceDate);
-
-          // Only include invoices from today (UTC)
+          // Today's Orders
           if (invoiceDate && invoiceDate >= todayStart) {
             if (invoice.restaurantName) {
-              if (!ordersCount[invoice.restaurantName]) {
-                ordersCount[invoice.restaurantName] = 0;
-              }
-              ordersCount[invoice.restaurantName]++;
+              ordersCount[invoice.restaurantName] = 
+                (ordersCount[invoice.restaurantName] || 0) + 1;
+            }
+          }
+
+          // Sales Trend (last 7 days)
+          const sevenDaysAgo = new Date();
+          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+          
+          if (invoiceDate && invoiceDate >= sevenDaysAgo) {
+            const formattedDate = invoiceDate.toLocaleDateString('en-GB', { 
+              day: '2-digit', 
+              month: 'short' 
+            });
+            
+            const existingDay = salesData.find(item => item.date === formattedDate);
+            if (existingDay) {
+              existingDay.sales += invoice.items.reduce((sum, item) => 
+                sum + (item.price * item.quantity), 0);
+            } else {
+              salesData.push({
+                date: formattedDate,
+                sales: invoice.items.reduce((sum, item) => 
+                  sum + (item.price * item.quantity), 0)
+              });
             }
           }
         });
 
-        setTodayOrders(ordersCount); // Update today's orders
+        // Sort sales data by date
+        salesData.sort((a, b) => {
+          const [dayA, monthA] = a.date.split(' ');
+          const [dayB, monthB] = b.date.split(' ');
+          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                          'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          return (months.indexOf(monthA) * 31 + parseInt(dayA)) - 
+                 (months.indexOf(monthB) * 31 + parseInt(dayB));
+        });
+
+        setTodayOrders(ordersCount);
+        setSalesTrend(salesData);
       }
     });
 
-    // Clean up listener on unmount
-
-    // Fetch Total Available Metrics
+    // Total Available Metrics
     const inventoryRef = collection(db, "inventoryItems");
     const unsubscribeTotalAvailable = onSnapshot(inventoryRef, (snapshot) => {
       let totalAvailableItems = 0;
@@ -100,13 +120,8 @@ const Dashboard = () => {
       });
     });
 
-    // Fetch Total Sold Metrics
-    const soldInvoicesQuery = query(
-      invoicesRef,
-      where("createdAt", "<", todayTimestamp)
-    );
-
-    const unsubscribeTotalSold = onSnapshot(soldInvoicesQuery, (snapshot) => {
+    // Total Sold Metrics
+    const unsubscribeTotalSold = onSnapshot(invoicesRef, (snapshot) => {
       let totalSoldItems = 0;
       let totalSoldCost = 0;
       let totalSoldQuantity = 0;
@@ -127,16 +142,15 @@ const Dashboard = () => {
       });
     });
 
-    // Clean up listeners on unmount
+    // Clean up listeners
     return () => {
-      unsubscribe();
-
+      unsubscribeOrders();
       unsubscribeTotalAvailable();
       unsubscribeTotalSold();
     };
   }, []);
 
-  // Separate effect for updating total combined when available or sold changes
+  // Combined Metrics Effect
   useEffect(() => {
     const combinedItems = (totalAvailable.items || 0) + (totalSold.items || 0);
     const combinedCost = (parseFloat(totalAvailable.cost) || 0) + (parseFloat(totalSold.cost) || 0);
@@ -151,53 +165,84 @@ const Dashboard = () => {
 
   const styles = {
     card: {
-      backgroundColor: "#FFFAE1", // light mustard yellow
-      color: "#C70039", // red
-      padding: "16px",
-    },
-    tableHeader: {
-      backgroundColor: "#C70039",
-      color: "white",
+      background: 'linear-gradient(145deg, #f0f4f8 0%, #ffffff 100%)',
+      boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+      borderRadius: '12px',
+      transition: 'transform 0.3s ease-in-out',
+      '&:hover': {
+        transform: 'scale(1.02)',
+      },
     },
     icon: {
-      marginRight: "8px",
+      color: '#C70039',
+      marginRight: '10px',
+      fontSize: '32px',
     },
     title: {
-      fontWeight: "bold",
-      marginBottom: "16px",
+      fontWeight: 700,
+      color: '#2c3e50',
+      display: 'flex',
+      alignItems: 'center',
+      marginBottom: '15px',
     },
-    cardItemContainer: {
-      display: "flex",
-      flexDirection: "column", // Column layout for the items
-      justifyContent: "space-around", // Add space between items
-      gap: "10px", // Add spacing between rows
-    },
-    itemRow: {
-      display: "flex",
-      justifyContent: "space-between", // Aligns key-value pairs horizontally
-      alignItems: "center",
-      marginBottom: "8px", // Adds spacing between the rows
+    metricValue: {
+      fontWeight: 600,
+      color: '#2c3e50',
     },
   };
 
   return (
-    <div>
-      <Header title={"Dashboard"} />
-      <Grid container spacing={3} sx={{ padding: "20px" }}>
+    <Box sx={{ 
+      // backgroundColor: '#f4f6f9', 
+      minHeight: '110vh', 
+      // padding: '20px' 
+    }}>
+      <Header title="Restaurant Dashboard" />
+      
+      <Grid container spacing={4} padding={4} >
+        {/* Sales Trend Chart */}
+        <Grid item xs={12}>
+          <Paper 
+            elevation={3} 
+            sx={{ 
+              borderRadius: '12px', 
+              padding: '20px',
+              backgroundColor: 'white' 
+            }}
+          >
+            <Typography variant="h6" sx={styles.title}>
+              <AttachMoneyIcon sx={styles.icon} />
+              Weekly Sales Trend
+            </Typography>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={salesTrend}>
+                <XAxis dataKey="date" />
+                <YAxis />
+                <Tooltip />
+                <Line 
+                  type="monotone" 
+                  dataKey="sales" 
+                  stroke="#C70039" 
+                  strokeWidth={3}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </Paper>
+        </Grid>
+
         {/* Today's Orders */}
-        <Grid item xs={12} className="centeredCard" style={styles.centeredCard}>
-          <Card style={{ ...styles.card, width: "100%" }}>
+        <Grid item xs={12} md={4}>
+          <Card sx={styles.card}>
             <CardContent>
-              <Typography variant="h6" style={styles.title}>
-                <RestaurantIcon style={styles.icon} /> Today's Orders
+              <Typography variant="h6" sx={styles.title}>
+                <RestaurantIcon sx={styles.icon} /> 
+                Today's Orders
               </Typography>
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell style={styles.tableHeader}>
-                      Restaurant Name
-                    </TableCell>
-                    <TableCell style={styles.tableHeader}>Orders</TableCell>
+                    <TableCell>Restaurant</TableCell>
+                    <TableCell align="right">Orders</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -211,7 +256,9 @@ const Dashboard = () => {
                     Object.keys(todayOrders).map((restaurant) => (
                       <TableRow key={restaurant}>
                         <TableCell>{restaurant}</TableCell>
-                        <TableCell>{todayOrders[restaurant] || 0}</TableCell>
+                        <TableCell align="right">
+                          {todayOrders[restaurant] || 0}
+                        </TableCell>
                       </TableRow>
                     ))
                   )}
@@ -221,106 +268,121 @@ const Dashboard = () => {
           </Card>
         </Grid>
 
-        {/* Second Row: Total Available, Total Sold, Total Combined */}
-        <Grid container item spacing={3} style={styles.rowContainer}>
-          <Grid item xs={12} sm={6} md={4}>
-            <Card style={styles.card}>
-              <CardContent>
-                <Typography variant="h6" style={styles.title}>
-                  <StoreIcon style={styles.icon} /> Total Available
-                </Typography>
-
-                {/* Group Items in a Flexbox container */}
-                <div style={styles.cardItemContainer}>
-                  <div style={styles.itemRow}>
+        {/* Total Available */}
+        <Grid item xs={12} md={4}>
+          <Card sx={styles.card}>
+            <CardContent>
+              <Typography variant="h6" sx={styles.title}>
+                <StoreIcon sx={styles.icon} /> 
+                Total Available
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12}>
+                  <Box display="flex" justifyContent="space-between">
                     <Typography>Items:</Typography>
-                    <Typography style={{ color: "black" }}>
+                    <Typography sx={styles.metricValue}>
                       {totalAvailable.items}
                     </Typography>
-                  </div>
-                  <div style={styles.itemRow}>
+                  </Box>
+                </Grid>
+                <Grid item xs={12}>
+                  <Box display="flex" justifyContent="space-between">
                     <Typography>Cost:</Typography>
-                    <Typography style={{ color: "black" }}>
+                    <Typography sx={styles.metricValue}>
                       £ {totalAvailable.cost}
                     </Typography>
-                  </div>
-                  <div style={styles.itemRow}>
+                  </Box>
+                </Grid>
+                <Grid item xs={12}>
+                  <Box display="flex" justifyContent="space-between">
                     <Typography>Quantity:</Typography>
-                    <Typography style={{ color: "black" }}>
+                    <Typography sx={styles.metricValue}>
                       {totalAvailable.quantity}
                     </Typography>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </Grid>
+                  </Box>
+                </Grid>
+              </Grid>
+            </CardContent>
+          </Card>
+        </Grid>
 
-          <Grid item xs={12} sm={6} md={4}>
-            <Card style={styles.card}>
-              <CardContent>
-                <Typography variant="h6" style={styles.title}>
-                  <ShoppingCartIcon style={styles.icon} /> Total Sold
-                </Typography>
-
-                {/* Flexbox for Sold Items */}
-                <div style={styles.cardItemContainer}>
-                  <div style={styles.itemRow}>
+        {/* Total Sold */}
+        <Grid item xs={12} md={4}>
+          <Card sx={styles.card}>
+            <CardContent>
+              <Typography variant="h6" sx={styles.title}>
+                <ShoppingCartIcon sx={styles.icon} /> 
+                Total Sold
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12}>
+                  <Box display="flex" justifyContent="space-between">
                     <Typography>Items:</Typography>
-                    <Typography style={{ color: "black" }}>
+                    <Typography sx={styles.metricValue}>
                       {totalSold.items}
                     </Typography>
-                  </div>
-                  <div style={styles.itemRow}>
+                  </Box>
+                </Grid>
+                <Grid item xs={12}>
+                  <Box display="flex" justifyContent="space-between">
                     <Typography>Cost:</Typography>
-                    <Typography style={{ color: "black" }}>
+                    <Typography sx={styles.metricValue}>
                       £ {totalSold.cost}
                     </Typography>
-                  </div>
-                  <div style={styles.itemRow}>
+                  </Box>
+                </Grid>
+                <Grid item xs={12}>
+                  <Box display="flex" justifyContent="space-between">
                     <Typography>Quantity:</Typography>
-                    <Typography style={{ color: "black" }}>
+                    <Typography sx={styles.metricValue}>
                       {totalSold.quantity}
                     </Typography>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </Grid>
+                  </Box>
+                </Grid>
+              </Grid>
+            </CardContent>
+          </Card>
+        </Grid>
 
-          <Grid item xs={12} sm={6} md={4}>
-            <Card style={styles.card}>
-              <CardContent>
-                <Typography variant="h6" style={styles.title}>
-                  <MergeTypeIcon style={styles.icon} /> Total Combined
-                </Typography>
-
-                {/* Flexbox for Combined Items */}
-                <div style={styles.cardItemContainer}>
-                  <div style={styles.itemRow}>
+        {/* Total Combined */}
+        <Grid item xs={12} md={12}>
+          <Card sx={styles.card}>
+            <CardContent>
+              <Typography variant="h6" sx={styles.title}>
+                <MergeTypeIcon sx={styles.icon} /> 
+                Total Combined
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={4}>
+                  <Box display="flex" justifyContent="space-between">
                     <Typography>Items:</Typography>
-                    <Typography style={{ color: "black" }}>
+                    <Typography sx={styles.metricValue}>
                       {totalCombined.items}
                     </Typography>
-                  </div>
-                  <div style={styles.itemRow}>
+                  </Box>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Box display="flex" justifyContent="space-between">
                     <Typography>Cost:</Typography>
-                    <Typography style={{ color: "black" }}>
+                    <Typography sx={styles.metricValue}>
                       £ {totalCombined.cost}
                     </Typography>
-                  </div>
-                  <div style={styles.itemRow}>
+                  </Box>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Box display="flex" justifyContent="space-between">
                     <Typography>Quantity:</Typography>
-                    <Typography style={{ color: "black" }}>
+                    <Typography sx={styles.metricValue}>
                       {totalCombined.quantity}
                     </Typography>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </Grid>
+                  </Box>
+                </Grid>
+              </Grid>
+            </CardContent>
+          </Card>
         </Grid>
       </Grid>
-    </div>
+    </Box>
   );
 };
 
