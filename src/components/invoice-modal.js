@@ -109,7 +109,7 @@ const InvoiceModal = ({ invoice, isModalOpen, handleClose }) => {
       setEditField(null);
     }
   };
-
+console.log(invoice,"oppo1wpoqwpoqwpoqw")
   return (
     <Dialog open={isModalOpen} onClose={handleClose} maxWidth="md" fullWidth>
       <DialogContent>
@@ -162,7 +162,8 @@ const InvoiceModal = ({ invoice, isModalOpen, handleClose }) => {
             </div>
             <div style={{ width: "45%" }}>
               <strong>Invoice date:</strong>{" "}
-              {new Date().toISOString().split("T")[0]}
+              {/* {new Date().toISOString().split("T")[0]} */}
+              {new Date(invoice.createdAt).toLocaleDateString('en-CA')}
             </div>
           </div>
 
