@@ -364,7 +364,7 @@ const Dashboard = () => {
         </Grid>
 
         {/* Total Combined */}
-        <Grid item xs={12} md={12}>
+        {/* <Grid item xs={12} md={12}>
           <Card sx={styles.card}>
             <CardContent>
               <Typography variant="h6" sx={styles.title}>
@@ -399,7 +399,7 @@ const Dashboard = () => {
               </Grid>
             </CardContent>
           </Card>
-        </Grid>
+        </Grid> */}
       </Grid>
     </Box>
   );

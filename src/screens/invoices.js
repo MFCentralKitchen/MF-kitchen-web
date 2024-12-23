@@ -1,5 +1,16 @@
 import React, { useEffect, useState } from "react";
-import { collection, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy } from "firebase/firestore";
+import {
+  collection,
+  onSnapshot,
+  doc,
+  updateDoc,
+  deleteDoc,
+  query,
+  orderBy,
+  where,
+  getDocs,
+  getDoc
+} from "firebase/firestore";
 import { db } from "../firebase-config";
 import {
   Table,
@@ -24,7 +35,7 @@ import {
   TablePagination,
   IconButton,
   Stack,
-  Box
+  Box,
 } from "@mui/material";
 import { Eye, Trash2, Search } from "lucide-react";
 import InvoiceModal from "../components/invoice-modal";
@@ -36,7 +47,10 @@ const InvoiceScreen = () => {
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortConfig, setSortConfig] = useState({ key: 'createdAt', direction: 'desc' });
+  const [sortConfig, setSortConfig] = useState({
+    key: "createdAt",
+    direction: "desc",
+  });
   const [editingInvoiceId, setEditingInvoiceId] = useState(null);
   const [orderStatusValue, setOrderStatusValue] = useState("");
   const [paymentStatusValue, setPaymentStatusValue] = useState("");
@@ -66,26 +80,26 @@ const InvoiceScreen = () => {
   }, []);
 
   const handleSort = (column) => {
-    let direction = 'asc';
-    if (sortConfig.key === column && sortConfig.direction === 'asc') {
-      direction = 'desc';
+    let direction = "asc";
+    if (sortConfig.key === column && sortConfig.direction === "asc") {
+      direction = "desc";
     }
-    
+
     const sorted = [...filteredInvoices].sort((a, b) => {
-      if (column === 'totalPrice') {
-        return direction === 'asc' 
+      if (column === "totalPrice") {
+        return direction === "asc"
           ? parseFloat(a[column]) - parseFloat(b[column])
           : parseFloat(b[column]) - parseFloat(a[column]);
       }
-      
-      if (column === 'createdAt') {
-        return direction === 'asc'
+
+      if (column === "createdAt") {
+        return direction === "asc"
           ? new Date(a[column]) - new Date(b[column])
           : new Date(b[column]) - new Date(a[column]);
       }
-      
-      if (a[column] < b[column]) return direction === 'asc' ? -1 : 1;
-      if (a[column] > b[column]) return direction === 'asc' ? 1 : -1;
+
+      if (a[column] < b[column]) return direction === "asc" ? -1 : 1;
+      if (a[column] > b[column]) return direction === "asc" ? 1 : -1;
       return 0;
     });
 
@@ -113,19 +127,68 @@ const InvoiceScreen = () => {
     }
   };
 
+  
+
   const handleDelete = async () => {
-    if (deleteType === 'single' && invoiceToDelete) {
-      await deleteDoc(doc(db, 'invoices', invoiceToDelete));
-      setInvoices((prev) => prev.filter((invoice) => invoice.id !== invoiceToDelete));
-      setFilteredInvoices((prev) => prev.filter((invoice) => invoice.id !== invoiceToDelete));
-    } else if (deleteType === 'multiple') {
-      for (const id of selectedInvoices) {
-        await deleteDoc(doc(db, 'invoices', id));
+    const updateSoldQuantity = async (item) => {
+      // Query inventoryItems for the matching item
+      const q = query(
+        collection(db, "inventoryItems"),
+        where("title", "==", item.title),
+        where("brand", "==", item.brand)
+      );
+
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        const docRef = querySnapshot.docs[0].ref; // Assuming unique titles/brands
+        const inventoryItem = querySnapshot.docs[0].data();
+
+        // Update soldQuantity
+        await updateDoc(docRef, {
+          soldQuantity: Math.max(0, inventoryItem.soldQuantity - item.quantity), // Ensure non-negative value
+        });
       }
-      setInvoices((prev) => prev.filter((invoice) => !selectedInvoices.includes(invoice.id)));
-      setFilteredInvoices((prev) => prev.filter((invoice) => !selectedInvoices.includes(invoice.id)));
+    };
+
+    if (deleteType === "single" && invoiceToDelete) {
+      // Fetch the invoice data
+      const invoiceDoc = await getDoc(doc(db, "invoices", invoiceToDelete));
+      if (invoiceDoc.exists()) {
+        const invoice = invoiceDoc.data();
+        for (const item of invoice.items) {
+          await updateSoldQuantity(item);
+        }
+      }
+
+      // Delete the invoice
+      await deleteDoc(doc(db, "invoices", invoiceToDelete));
+      setFilteredInvoices((prev) =>
+        prev.filter((invoice) => invoice.id !== invoiceToDelete)
+      );
+    } else if (deleteType === "multiple") {
+      for (const id of selectedInvoices) {
+        const invoiceDoc = await getDoc(doc(db, "invoices", id));
+        if (invoiceDoc.exists()) {
+          const invoice = invoiceDoc.data();
+          for (const item of invoice.items) {
+            await updateSoldQuantity(item);
+          }
+        }
+
+        // Delete each invoice
+        await deleteDoc(doc(db, "invoices", id));
+      }
+
+      setInvoices((prev) =>
+        prev.filter((invoice) => !selectedInvoices.includes(invoice.id))
+      );
+      setFilteredInvoices((prev) =>
+        prev.filter((invoice) => !selectedInvoices.includes(invoice.id))
+      );
     }
 
+    // Reset state
     setDeleteDialogOpen(false);
     setSelectedInvoices([]);
     setInvoiceToDelete(null);
@@ -143,11 +206,15 @@ const InvoiceScreen = () => {
   // Other existing functions remain the same...
   const toggleSelectInvoice = (id) => {
     setSelectedInvoices((prev) =>
-      prev.includes(id) ? prev.filter((invoiceId) => invoiceId !== id) : [...prev, id]
+      prev.includes(id)
+        ? prev.filter((invoiceId) => invoiceId !== id)
+        : [...prev, id]
     );
   };
 
-  const isAllSelected = filteredInvoices.length > 0 && selectedInvoices.length === filteredInvoices.length;
+  const isAllSelected =
+    filteredInvoices.length > 0 &&
+    selectedInvoices.length === filteredInvoices.length;
 
   const toggleSelectAll = () => {
     if (isAllSelected) {
@@ -169,7 +236,10 @@ const InvoiceScreen = () => {
 
   // Get current page data
   const getCurrentPageData = () => {
-    return filteredInvoices.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+    return filteredInvoices.slice(
+      page * rowsPerPage,
+      page * rowsPerPage + rowsPerPage
+    );
   };
 
   return (
@@ -177,7 +247,12 @@ const InvoiceScreen = () => {
       <Header title="Invoices" />
 
       <Stack spacing={3}>
-        <Stack direction="row" spacing={2} alignItems="center" style={{margin:"10px 10px 0px 10px"}}>
+        <Stack
+          direction="row"
+          spacing={2}
+          alignItems="center"
+          style={{ margin: "10px 10px 0px 10px" }}
+        >
           <TextField
             label="Search by Restaurant"
             variant="outlined"
@@ -185,18 +260,20 @@ const InvoiceScreen = () => {
             value={searchQuery}
             onChange={handleSearch}
             InputProps={{
-              startAdornment: <Search size={20} color="#666" style={{ marginRight: 8 }} />,
+              startAdornment: (
+                <Search size={20} color="#666" style={{ marginRight: 8 }} />
+              ),
             }}
             sx={{ backgroundColor: "white", borderRadius: 1 }}
           />
-          
+
           <Button
             variant="contained"
             color="error"
             disabled={selectedInvoices.length === 0}
             onClick={() => {
               setDeleteDialogOpen(true);
-              setDeleteType('multiple');
+              setDeleteType("multiple");
             }}
             startIcon={<Trash2 size={20} />}
           >
@@ -209,66 +286,105 @@ const InvoiceScreen = () => {
             <CircularProgress />
           </Box>
         ) : (
-          <Paper elevation={3} sx={{ backgroundColor: 'white', borderRadius: 2, position: 'relative' }}>
-            <TableContainer sx={{ maxHeight: 'calc(100vh - 100px)' }}>
+          <Paper
+            elevation={3}
+            sx={{
+              backgroundColor: "white",
+              borderRadius: 2,
+              position: "relative",
+            }}
+          >
+            <TableContainer sx={{ maxHeight: "calc(100vh - 100px)" }}>
               <Table stickyHeader>
                 <TableHead>
                   <TableRow>
-                    <TableCell padding="checkbox" sx={{ backgroundColor: '#f5f5f5' }}>
+                    <TableCell
+                      padding="checkbox"
+                      sx={{ backgroundColor: "#f5f5f5" }}
+                    >
                       <Checkbox
                         checked={isAllSelected}
                         onChange={toggleSelectAll}
-                        indeterminate={selectedInvoices.length > 0 && !isAllSelected}
+                        indeterminate={
+                          selectedInvoices.length > 0 && !isAllSelected
+                        }
                       />
                     </TableCell>
-                    <TableCell sx={{ backgroundColor: '#f5f5f5' }}>
+                    <TableCell sx={{ backgroundColor: "#f5f5f5" }}>
                       <TableSortLabel
-                        active={sortConfig.key === 'id'}
-                        direction={sortConfig.key === 'id' ? sortConfig.direction : 'asc'}
-                        onClick={() => handleSort('id')}
+                        active={sortConfig.key === "id"}
+                        direction={
+                          sortConfig.key === "id" ? sortConfig.direction : "asc"
+                        }
+                        onClick={() => handleSort("id")}
                       >
                         Order ID
                       </TableSortLabel>
                     </TableCell>
-                    <TableCell sx={{ backgroundColor: '#f5f5f5' }}>
+                    <TableCell sx={{ backgroundColor: "#f5f5f5" }}>
                       <TableSortLabel
-                        active={sortConfig.key === 'name'}
-                        direction={sortConfig.key === 'name' ? sortConfig.direction : 'asc'}
-                        onClick={() => handleSort('name')}
+                        active={sortConfig.key === "name"}
+                        direction={
+                          sortConfig.key === "name"
+                            ? sortConfig.direction
+                            : "asc"
+                        }
+                        onClick={() => handleSort("name")}
                       >
                         Name
                       </TableSortLabel>
                     </TableCell>
-                    <TableCell sx={{ backgroundColor: '#f5f5f5' }}>
+                    <TableCell sx={{ backgroundColor: "#f5f5f5" }}>
                       <TableSortLabel
-                        active={sortConfig.key === 'restaurantName'}
-                        direction={sortConfig.key === 'restaurantName' ? sortConfig.direction : 'asc'}
-                        onClick={() => handleSort('restaurantName')}
+                        active={sortConfig.key === "restaurantName"}
+                        direction={
+                          sortConfig.key === "restaurantName"
+                            ? sortConfig.direction
+                            : "asc"
+                        }
+                        onClick={() => handleSort("restaurantName")}
                       >
                         Restaurant
                       </TableSortLabel>
                     </TableCell>
-                    <TableCell sx={{ backgroundColor: '#f5f5f5' }}>
+                    <TableCell sx={{ backgroundColor: "#f5f5f5" }}>
                       <TableSortLabel
-                        active={sortConfig.key === 'totalPrice'}
-                        direction={sortConfig.key === 'totalPrice' ? sortConfig.direction : 'asc'}
-                        onClick={() => handleSort('totalPrice')}
+                        active={sortConfig.key === "totalPrice"}
+                        direction={
+                          sortConfig.key === "totalPrice"
+                            ? sortConfig.direction
+                            : "asc"
+                        }
+                        onClick={() => handleSort("totalPrice")}
                       >
                         Total Price
                       </TableSortLabel>
                     </TableCell>
-                    <TableCell sx={{ backgroundColor: '#f5f5f5' }}>
+                    <TableCell sx={{ backgroundColor: "#f5f5f5" }}>
                       <TableSortLabel
-                        active={sortConfig.key === 'createdAt'}
-                        direction={sortConfig.key === 'createdAt' ? sortConfig.direction : 'asc'}
-                        onClick={() => handleSort('createdAt')}
+                        active={sortConfig.key === "createdAt"}
+                        direction={
+                          sortConfig.key === "createdAt"
+                            ? sortConfig.direction
+                            : "asc"
+                        }
+                        onClick={() => handleSort("createdAt")}
                       >
                         Ordered At
                       </TableSortLabel>
                     </TableCell>
-                    <TableCell sx={{ backgroundColor: '#f5f5f5' }}>Order Status</TableCell>
-                    <TableCell sx={{ backgroundColor: '#f5f5f5' }}>Payment Status</TableCell>
-                    <TableCell align="center" sx={{ backgroundColor: '#f5f5f5' }}>Actions</TableCell>
+                    <TableCell sx={{ backgroundColor: "#f5f5f5" }}>
+                      Order Status
+                    </TableCell>
+                    <TableCell sx={{ backgroundColor: "#f5f5f5" }}>
+                      Payment Status
+                    </TableCell>
+                    <TableCell
+                      align="center"
+                      sx={{ backgroundColor: "#f5f5f5" }}
+                    >
+                      Actions
+                    </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -284,12 +400,19 @@ const InvoiceScreen = () => {
                       <TableCell>{invoice.name}</TableCell>
                       <TableCell>{invoice.restaurantName}</TableCell>
                       <TableCell>£ {invoice.totalPrice}</TableCell>
-                      <TableCell>{new Date(invoice.createdAt).toLocaleString()}</TableCell>
+                      <TableCell>
+                        {new Date(invoice.createdAt).toLocaleString()}
+                      </TableCell>
                       <TableCell>
                         {editingInvoiceId === invoice.id ? (
                           <Select
                             value={orderStatusValue || invoice.orderStatus}
-                            onChange={(e) => handleOrderStatusChange(invoice.id, e.target.value)}
+                            onChange={(e) =>
+                              handleOrderStatusChange(
+                                invoice.id,
+                                e.target.value
+                              )
+                            }
                             onBlur={() => setEditingInvoiceId(null)}
                             size="small"
                             fullWidth
@@ -302,15 +425,18 @@ const InvoiceScreen = () => {
                         ) : (
                           <Box
                             sx={{
-                              backgroundColor: 
-                                invoice.orderStatus === "pending" ? "#fdd835" :
-                                invoice.orderStatus === "delivered" ? "#66bb6a" : "#ffa726",
+                              backgroundColor:
+                                invoice.orderStatus === "pending"
+                                  ? "#fdd835"
+                                  : invoice.orderStatus === "delivered"
+                                  ? "#66bb6a"
+                                  : "#ffa726",
                               borderRadius: "8px",
                               padding: "4px 8px",
                               display: "inline-block",
                               color: "#fff",
                               fontWeight: "bold",
-                              cursor: "pointer"
+                              cursor: "pointer",
                             }}
                             onClick={() => setEditingInvoiceId(invoice.id)}
                           >
@@ -321,8 +447,16 @@ const InvoiceScreen = () => {
                       <TableCell>
                         {editingInvoiceId === invoice.id ? (
                           <Select
-                            value={paymentStatusValue || (invoice.isBillPaid ? "paid" : "pending")}
-                            onChange={(e) => handlePaymentStatusChange(invoice.id, e.target.value === "paid")}
+                            value={
+                              paymentStatusValue ||
+                              (invoice.isBillPaid ? "paid" : "pending")
+                            }
+                            onChange={(e) =>
+                              handlePaymentStatusChange(
+                                invoice.id,
+                                e.target.value === "paid"
+                              )
+                            }
                             onBlur={() => setEditingInvoiceId(null)}
                             size="small"
                             fullWidth
@@ -333,13 +467,15 @@ const InvoiceScreen = () => {
                         ) : (
                           <Box
                             sx={{
-                              backgroundColor: invoice.isBillPaid ? "#66bb6a" : "#ef5350",
+                              backgroundColor: invoice.isBillPaid
+                                ? "#66bb6a"
+                                : "#ef5350",
                               borderRadius: "8px",
                               padding: "4px 8px",
                               display: "inline-block",
                               color: "#fff",
                               fontWeight: "bold",
-                              cursor: "pointer"
+                              cursor: "pointer",
                             }}
                             onClick={() => setEditingInvoiceId(invoice.id)}
                           >
@@ -348,8 +484,12 @@ const InvoiceScreen = () => {
                         )}
                       </TableCell>
                       <TableCell align="center">
-                        <Stack direction="row" spacing={1} justifyContent="center">
-                          <IconButton 
+                        <Stack
+                          direction="row"
+                          spacing={1}
+                          justifyContent="center"
+                        >
+                          <IconButton
                             color="primary"
                             onClick={() => {
                               setSelectedInvoice(invoice);
@@ -362,7 +502,7 @@ const InvoiceScreen = () => {
                             color="error"
                             onClick={() => {
                               setDeleteDialogOpen(true);
-                              setDeleteType('single');
+                              setDeleteType("single");
                               setInvoiceToDelete(invoice.id);
                             }}
                           >
@@ -375,7 +515,7 @@ const InvoiceScreen = () => {
                 </TableBody>
               </Table>
             </TableContainer>
-            
+
             <TablePagination
               component="div"
               count={filteredInvoices.length}
@@ -385,29 +525,30 @@ const InvoiceScreen = () => {
               onRowsPerPageChange={handleChangeRowsPerPage}
               rowsPerPageOptions={[30, 50, 100]}
               sx={{
-                position: 'sticky',
+                position: "sticky",
                 bottom: 0,
-                backgroundColor: 'white',
-                borderTop: '1px solid rgba(224, 224, 224, 1)'
+                backgroundColor: "white",
+                borderTop: "1px solid rgba(224, 224, 224, 1)",
               }}
             />
           </Paper>
         )}
 
         {/* Delete Confirmation Dialog */}
-        <Dialog 
-          open={deleteDialogOpen} 
+        <Dialog
+          open={deleteDialogOpen}
           onClose={() => setDeleteDialogOpen(false)}
           PaperProps={{
             sx: {
               borderRadius: 2,
-              padding: 1
-            }
+              padding: 1,
+            },
           }}
         >
           <DialogTitle>Confirm Delete</DialogTitle>
           <DialogContent>
-            Are you sure you want to delete the selected invoice{deleteType === 'multiple' ? 's' : ''}?
+            Are you sure you want to delete the selected invoice
+            {deleteType === "multiple" ? "s" : ""}?
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setDeleteDialogOpen(false)} color="inherit">
