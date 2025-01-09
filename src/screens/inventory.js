@@ -14,9 +14,11 @@ import {
   Snackbar,
   Grid,
   Box,
-  TablePagination,
   Pagination,
   MenuItem,
+  Paper,
+  Typography,
+  styled,
 } from "@mui/material";
 import {
   collection,
@@ -28,8 +30,7 @@ import {
   getDocs,
   deleteDoc,
 } from "firebase/firestore";
-import { Timestamp } from "firebase/firestore"; // Import Timestamp
-import { Delete } from "@mui/icons-material";
+import { Delete, Edit, Save, Add, Category } from "@mui/icons-material";
 import Dialog from "@mui/material/Dialog";
 import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
@@ -39,7 +40,6 @@ import { db } from "../firebase-config";
 import AddCategoryModal from "../components/add-category-modal";
 import AddProductModal from "../components/add-product-modal";
 import Collections from "../collections";
-import { Edit, Save } from "@mui/icons-material";
 import Header from "../components/header";
 
 const Inventory = () => {
@@ -69,6 +69,58 @@ const Inventory = () => {
   const [rowsPerPage, setRowsPerPage] = useState(30);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+
+  const StyledTableCell = styled(TableCell)(({ theme }) => ({
+    fontWeight: "bold",
+    backgroundColor: "#C70A0A",
+    color: "white",
+    '&.MuiTableCell-body': {
+      fontSize: 14,
+    },
+  }));
+  
+  const StyledTableRow = styled(TableRow)(({ theme }) => ({
+    '&:nth-of-type(odd)': {
+      backgroundColor: "#FFF8E7",
+    },
+    '&:hover': {
+      backgroundColor: "#FFE4B5",
+    },
+  }));
+  
+  const TotalRow = styled(TableRow)(({ theme }) => ({
+    backgroundColor: "#FFB500",
+    position: "sticky",
+    bottom: 0,
+    zIndex: 10,
+    '& .MuiTableCell-body': {
+      fontWeight: 'bold',
+      color: "#C70A0A",
+    },
+  }));
+  
+  const ActionButton = styled(Button)(({ theme }) => ({
+    margin: theme.spacing(1),
+    textTransform: 'none',
+    fontWeight: 'bold',
+  }));
+  
+  const SearchField = styled(TextField)({
+    '& .MuiOutlinedInput-root': {
+      '& fieldset': {
+        borderColor: '#C70A0A',
+      },
+      '&:hover fieldset': {
+        borderColor: '#FFB500',
+      },
+      '&.Mui-focused fieldset': {
+        borderColor: '#C70A0A',
+      },
+    },
+    '& .MuiInputLabel-root': {
+      color: '#C70A0A',
+    },
+  });
 
   const handleDelete = async () => {
     if (!itemToDelete) return;
@@ -301,8 +353,8 @@ const Inventory = () => {
   return (
     <Box sx={{ backgroundColor: "#FFFAE1", color: "#C70A0A", width: "100%" }}>
       <Header title="Inventory" />
-      <Grid container spacing={3} alignItems="center" mb={3}>
-        <Grid item xs={12} md={5} margin={2}>
+      <Grid container spacing={3} alignItems="center">
+        <Grid item xs={12} md={5} margin={1}>
           <TextField
             fullWidth
             label="Search Products by title or category"
@@ -337,12 +389,12 @@ const Inventory = () => {
           </Button>
         </Grid>
       </Grid>
-      <div style={{ overflowY: "auto", maxHeight: "100%" }}>
-        <TableContainer sx={{ maxWidth: "100%", overflowX: "auto" }}>
-          <Table>
+      <Paper elevation={3} sx={{ backgroundColor: "#FFF8E7" }}>
+        <TableContainer sx={{ maxHeight: "calc(100vh)" }}>
+          <Table stickyHeader>
             <TableHead>
               <TableRow>
-                <TableCell style={{ fontWeight: "bold", minWidth: "150px" }}>
+                <TableCell style={{ fontWeight: "bold", minWidth: "150px",backgroundColor:'#C70A0A', color:'white' }}>
                   <TableSortLabel
                     active={orderBy === "title"}
                     direction={orderBy === "title" ? orderDirection : "asc"}
@@ -351,7 +403,7 @@ const Inventory = () => {
                     Title
                   </TableSortLabel>
                 </TableCell>
-                <TableCell style={{ fontWeight: "bold", minWidth: "100px" }}>
+                <TableCell style={{ fontWeight: "bold", minWidth: "100px",backgroundColor:'#C70A0A', color:'white' }}>
                   <TableSortLabel
                     active={orderBy === "brand"}
                     direction={orderBy === "brand" ? orderDirection : "asc"}
@@ -360,16 +412,17 @@ const Inventory = () => {
                     Brand
                   </TableSortLabel>
                 </TableCell>
-                <TableCell style={{ fontWeight: "bold", minWidth: "100px" }}>
+                <TableCell style={{ fontWeight: "bold", minWidth: "100px" ,backgroundColor:'#C70A0A', color:'white'}}>
                   <TableSortLabel
                     active={orderBy === "vendor"}
                     direction={orderBy === "vendor" ? orderDirection : "asc"}
                     onClick={() => handleSort("vendor")}
+                    style={{color:'white'}}
                   >
                     Vendor
                   </TableSortLabel>
                 </TableCell>
-                <TableCell style={{ fontWeight: "bold", minWidth: "200px" }}>
+                <TableCell style={{ fontWeight: "bold", minWidth: "200px" ,backgroundColor:'#C70A0A', color:'white'}}>
                   <TableSortLabel
                     active={orderBy === "category"}
                     direction={orderBy === "category" ? orderDirection : "asc"}
@@ -378,7 +431,7 @@ const Inventory = () => {
                     Category
                   </TableSortLabel>
                 </TableCell>
-                <TableCell style={{ fontWeight: "bold", minWidth: "100px" }}>
+                <TableCell style={{ fontWeight: "bold", minWidth: "100px" ,backgroundColor:'#C70A0A', color:'white'}}>
                   <TableSortLabel
                     active={orderBy === "units"}
                     direction={orderBy === "units" ? orderDirection : "asc"}
@@ -387,7 +440,7 @@ const Inventory = () => {
                     Units
                   </TableSortLabel>
                 </TableCell>
-                <TableCell style={{ fontWeight: "bold", minWidth: "150px" }}>
+                <TableCell style={{ fontWeight: "bold", minWidth: "150px" ,backgroundColor:'#C70A0A', color:'white'}}>
                   <TableSortLabel
                     active={orderBy === "availableQuantity"}
                     direction={
@@ -398,7 +451,7 @@ const Inventory = () => {
                     Quantity in stock
                   </TableSortLabel>
                 </TableCell>
-                <TableCell style={{ fontWeight: "bold", minWidth: "100px" }}>
+                <TableCell style={{ fontWeight: "bold", minWidth: "100px" ,backgroundColor:'#C70A0A', color:'white'}}>
                   <TableSortLabel
                     active={orderBy === "price"}
                     direction={orderBy === "price" ? orderDirection : "asc"}
@@ -407,7 +460,7 @@ const Inventory = () => {
                     Price per unit
                   </TableSortLabel>
                 </TableCell>
-                <TableCell style={{ fontWeight: "bold", minWidth: "100px" }}>
+                <TableCell style={{ fontWeight: "bold", minWidth: "100px",backgroundColor:'#C70A0A', color:'white' }}>
                   <TableSortLabel
                     active={orderBy === "soldQuantity"}
                     direction={
@@ -418,10 +471,10 @@ const Inventory = () => {
                     Stock out
                   </TableSortLabel>
                 </TableCell>
-                <TableCell style={{ fontWeight: "bold", minWidth: "100px" }}>
+                <TableCell style={{ fontWeight: "bold", minWidth: "100px",backgroundColor:'#C70A0A', color:'white' }}>
                   Total Price
                 </TableCell>
-                <TableCell style={{ fontWeight: "bold" }}>
+                <TableCell style={{ fontWeight: "bold",backgroundColor:'#C70A0A', color:'white' }}>
                   <TableSortLabel
                     active={orderBy === "updatedAt"}
                     direction={orderBy === "updatedAt" ? orderDirection : "asc"}
@@ -430,7 +483,7 @@ const Inventory = () => {
                     Updated At
                   </TableSortLabel>
                 </TableCell>
-                <TableCell style={{ fontWeight: "bold" }}>Action</TableCell>
+                <TableCell style={{ fontWeight: "bold",backgroundColor:'#C70A0A', color:'white' }}>Action</TableCell>
               </TableRow>
             </TableHead>
 
@@ -872,7 +925,7 @@ const Inventory = () => {
             />
           </Box>
         </TableContainer>
-      </div>
+      </Paper>
       <Dialog
         open={deleteConfirmOpen}
         onClose={() => setDeleteConfirmOpen(false)}

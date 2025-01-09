@@ -1,136 +1,144 @@
-import React from 'react';
-import { Drawer, List, ListItem, ListItemIcon, ListItemText, useMediaQuery } from '@mui/material';
+import React, { useState } from 'react';
+import { Drawer, List, ListItem, ListItemIcon, ListItemText, IconButton, useMediaQuery } from '@mui/material';
 import { Link, useLocation } from 'react-router-dom';
-import LOGO from '../assets/MF-CPU-LOGO.png';
+import MenuIcon from '@mui/icons-material/Menu';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import InventoryIcon from '@mui/icons-material/Inventory';
-import ReceiptIcon from '@mui/icons-material/Receipt';
+import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
+import DescriptionIcon from '@mui/icons-material/Description';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import GroupIcon from '@mui/icons-material/Group';
+import CloseIcon from '@mui/icons-material/Close';
+import LOGO from '../assets/MF-CPU-LOGO.png';
 
 const Sidebar = () => {
-  const location = useLocation(); // Hook to get the current location
+  const location = useLocation();
+  const isMobile = useMediaQuery("(max-width:768px)");
+  const [isOpen, setIsOpen] = useState(!isMobile);
 
   const isActive = (path) => location.pathname === path;
-  const isMobile = useMediaQuery("(max-width:600px)");
+
+  const toggleDrawer = () => {
+    setIsOpen(!isOpen);
+  };
+
+  const drawerWidth = isMobile ? '240px' : '250px';
+  
+  const menuItems = [
+    { path: '/dashboard', icon: DashboardIcon, text: 'Dashboard' },
+    { path: '/add-users', icon: PersonAddIcon, text: 'Add Users' },
+    { path: '/inventory', icon: InventoryIcon, text: 'Inventory' },
+    { path: '/invoices', icon: ShoppingCartIcon, text: 'Orders' },
+    { path: '/ConsolidatedInvoiceScreen', icon: DescriptionIcon, text: 'Invoices' },
+    { path: '/manage-users', icon: GroupIcon, text: 'Manage Users' },
+  ];
+
+  const sidebarStyles = {
+    drawerPaper: {
+      width: drawerWidth,
+      backgroundColor: '#FFFFFF',
+      borderRight: 'none',
+      transition: 'width 0.3s ease-in-out',
+    },
+    logo: {
+      padding: '20px',
+      textAlign: 'center',
+      backgroundColor: '#FFE5E5',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    logoImage: {
+      width: isMobile ? '100px' : '140px',
+      margin: '0 auto',
+    },
+    menuItem: (isItemActive) => ({
+      margin: '8px 16px',
+      borderRadius: '8px',
+      backgroundColor: isItemActive ? '#F5B300' : 'transparent',
+      '&:hover': {
+        backgroundColor: isItemActive ? '#F5B300' : '#FFE5E5',
+      },
+      transition: 'all 0.2s ease-in-out',
+    }),
+    icon: (isItemActive) => ({
+      color: isItemActive ? '#FFFFFF' : '#FF0000',
+      minWidth: '40px',
+    }),
+    text: (isItemActive) => ({
+      color: isItemActive ? '#FFFFFF' : '#1A1A1A',
+      '& .MuiTypography-root': {
+        fontWeight: isItemActive ? 600 : 400,
+      },
+    }),
+    hamburgerButton: {
+      position: 'fixed',
+      left: isOpen ? drawerWidth : '10px',
+      top: '25px',
+      zIndex: 1200,
+      backgroundColor: '#F5B300',
+      '&:hover': {
+        backgroundColor: '#FF0000',
+      },
+    },
+  };
 
   return (
-    <Drawer
-      variant="persistent"
-      anchor="left"
-      open
-      sx={{
-        // width: 260,
-        flexShrink: 0,
-        '& .MuiDrawer-paper': { width:isMobile? "19%" :"17.5%", boxSizing: 'border-box' },
-        '@media (max-width: 600px)': {
-          // width: 200,
-          '& .MuiDrawer-paper': { },
-        },
-      }}
-    >
-      <div style={{ alignContent: 'center', textAlign: 'center', backgroundColor: '#f8f4e1' }}>
-        <img src={LOGO} alt="My Image" style={{ width:isMobile? "70px" : "160px", margin: "20px auto", backgroundColor: '#f8f4e1' }} />
-      </div>
-      <List sx={{
-        padding: '10px',
-        backgroundColor: '#f8f4e1',
-        height: '100%',
-      }}>
-         <ListItem
-          button
-          component={Link}
-          to="/dashboard" // Add new route for Dashboard
-          sx={{
-            backgroundColor: isActive('/dashboard') ? '#f5b300' : '#f8f4e1',
-            '&:hover': {
-              backgroundColor: isActive('/dashboard') ? '#f5b300' : '#e0e0e0',
-            },
-            borderRadius: '4px',
-            marginBottom: '10px',
-          }}
+    <>
+      {isMobile && (
+        <IconButton
+          onClick={toggleDrawer}
+          sx={sidebarStyles.hamburgerButton}
         >
-          <ListItemIcon>
-            <DashboardIcon sx={{ color: isActive('/dashboard') ? '#fff' : '#000' }} />
-          </ListItemIcon>
-          <ListItemText primary="Dashboard" sx={{ color: isActive('/dashboard') ? '#fff' : '#000' }} />
-        </ListItem>
-        <ListItem
-          button
-          component={Link}
-          to="/add-users"
-          sx={{
-            backgroundColor: isActive('/add-users') ? '#f5b300' : '#f8f4e1',
-            '&:hover': {
-              backgroundColor: isActive('/add-users') ? '#f5b300' : '#e0e0e0',
-            },
-            borderRadius: '4px',
-            marginBottom: '10px',
-          }}
-        >
-          <ListItemIcon>
-            <PersonAddIcon sx={{ color: isActive('/add-users') ? '#fff' : '#000' }} />
-          </ListItemIcon>
-          <ListItemText primary="Add Users" sx={{ color: isActive('/add-users') ? '#fff' : '#000' }} />
-        </ListItem>
+          {isOpen ? <CloseIcon /> : <MenuIcon />}
+        </IconButton>
+      )}
+      
+      <Drawer
+        variant={isMobile ? "temporary" : "permanent"}
+        open={isOpen}
+        onClose={toggleDrawer}
+        sx={{
+          width: drawerWidth,
+          flexShrink: 0,
+          '& .MuiDrawer-paper': sidebarStyles.drawerPaper,
+        }}
+      >
+        <div style={sidebarStyles.logo}>
+          <img 
+            src={LOGO} 
+            alt="Logo" 
+            style={sidebarStyles.logoImage} 
+          />
+          {isMobile && (
+            <IconButton onClick={toggleDrawer} sx={{ color: '#FF0000' }}>
+              <CloseIcon />
+            </IconButton>
+          )}
+        </div>
 
-        <ListItem
-          button
-          component={Link}
-          to="/inventory"
-          sx={{
-            backgroundColor: isActive('/inventory') ? '#f5b300' : '#f8f4e1',
-            '&:hover': {
-              backgroundColor: isActive('/inventory') ? '#f5b300' : '#e0e0e0',
-            },
-            borderRadius: '4px',
-            marginBottom: '10px',
-          }}
-        >
-          <ListItemIcon>
-            <InventoryIcon sx={{ color: isActive('/inventory') ? '#fff' : '#000' }} />
-          </ListItemIcon>
-          <ListItemText primary="Inventory" sx={{ color: isActive('/inventory') ? '#fff' : '#000' }} />
-        </ListItem>
-
-        <ListItem
-          button
-          component={Link}
-          to="/invoices"
-          sx={{
-            backgroundColor: isActive('/invoices') ? '#f5b300' : '#f8f4e1',
-            '&:hover': {
-              backgroundColor: isActive('/invoices') ? '#f5b300' : '#e0e0e0',
-            },
-            borderRadius: '4px',
-            marginBottom: '10px',
-          }}
-        >
-          <ListItemIcon>
-            <ReceiptIcon sx={{ color: isActive('/invoices') ? '#fff' : '#000' }} />
-          </ListItemIcon>
-          <ListItemText primary="Invoices" sx={{ color: isActive('/invoices') ? '#fff' : '#000' }} />
-        </ListItem>
-        <ListItem
-          button
-          component={Link}
-          to="/manage-users"
-          sx={{
-            backgroundColor: isActive('/manage-users') ? '#f5b300' : '#f8f4e1',
-            '&:hover': {
-              backgroundColor: isActive('/manage-users') ? '#f5b300' : '#e0e0e0',
-            },
-            borderRadius: '4px',
-            marginBottom: '10px',
-          }}
-        >
-          <ListItemIcon>
-            <GroupIcon sx={{ color: isActive('/manage-users') ? '#fff' : '#000' }} />
-          </ListItemIcon>
-          <ListItemText primary="Manage Users" sx={{ color: isActive('/manage-users') ? '#fff' : '#000' }} />
-        </ListItem>
-      </List>
-    </Drawer>
+        <List sx={{ mt: 2 }}>
+          {menuItems.map(({ path, icon: Icon, text }) => (
+            <ListItem
+              button
+              component={Link}
+              to={path}
+              key={path}
+              sx={sidebarStyles.menuItem(isActive(path))}
+              onClick={isMobile ? toggleDrawer : undefined}
+            >
+              <ListItemIcon sx={sidebarStyles.icon(isActive(path))}>
+                <Icon />
+              </ListItemIcon>
+              <ListItemText 
+                primary={text} 
+                sx={sidebarStyles.text(isActive(path))}
+              />
+            </ListItem>
+          ))}
+        </List>
+      </Drawer>
+    </>
   );
 };
 

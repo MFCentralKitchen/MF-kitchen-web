@@ -1,33 +1,74 @@
 import React, { useEffect, useState } from "react";
-import { db } from "../firebase-config";
-import { collection, query, onSnapshot } from "firebase/firestore";
 import {
   Card,
   CardContent,
   Typography,
   Grid,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
   Box,
   Paper,
+  Alert,
+  AlertTitle,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
 } from "@mui/material";
-import Header from "../components/header";
-import RestaurantIcon from "@mui/icons-material/Restaurant";
-import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
-import StoreIcon from "@mui/icons-material/Store";
-import MergeTypeIcon from "@mui/icons-material/MergeType";
-import AttachMoneyIcon from "@mui/icons-material/CurrencyPound";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import {
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+} from "recharts";
+import {
+  AlertCircle,
+  TrendingUp,
+  Package,
+  CircleDollarSign,
+  ShoppingBag,
+  ChevronDown,
+  PoundSterling,
+} from "lucide-react";
+import { collection, query, onSnapshot, getDocs } from "firebase/firestore";
+import { db } from "../firebase-config";
+import fetchRestaurantPerformance from "./fetchRestaurantPerformance";
+import TodayInvoicesGrid from "../components/TodayInvoicesGrid";
 
 const Dashboard = () => {
+  const [orderStatusData, setOrderStatusData] = useState([]);
+  const [categoryData, setCategoryData] = useState([]);
+  const [lowStockItems, setLowStockItems] = useState([]);
+  const [restaurantPerformance, setRestaurantPerformance] = useState([]);
+  const [salesTrend, setSalesTrend] = useState([]);
   const [todayOrders, setTodayOrders] = useState({});
   const [totalAvailable, setTotalAvailable] = useState({});
   const [totalSold, setTotalSold] = useState({});
   const [totalCombined, setTotalCombined] = useState({});
-  const [salesTrend, setSalesTrend] = useState([]);
+  const getChartHeight = () => {
+    return window.innerWidth <= 768 ? 200 : 300;
+  };
+
+  const [chartHeight, setChartHeight] = useState(getChartHeight());
+
+  useEffect(() => {
+    const handleResize = () => {
+      setChartHeight(getChartHeight());
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  const getResturantPerformanceData = async () => {
+    const restaurantPerformanceData = await fetchRestaurantPerformance(db);
+    console.log(restaurantPerformanceData, "tettauhjdghkjchfgsh");
+    setRestaurantPerformance(restaurantPerformanceData);
+  };
 
   useEffect(() => {
     const todayStart = new Date();
@@ -39,6 +80,7 @@ const Dashboard = () => {
     const unsubscribeOrders = onSnapshot(invoicesRef, (snapshot) => {
       const ordersCount = {};
       const salesData = [];
+      const statusCount = new Map();
 
       if (!snapshot.empty) {
         snapshot.forEach((doc) => {
@@ -55,30 +97,48 @@ const Dashboard = () => {
           // Today's Orders
           if (invoiceDate && invoiceDate >= todayStart) {
             if (invoice.restaurantName) {
-              ordersCount[invoice.restaurantName] = 
+              ordersCount[invoice.restaurantName] =
                 (ordersCount[invoice.restaurantName] || 0) + 1;
             }
           }
 
+          // Order Status
+          const status =
+            (invoice.orderStatus || "Pending").charAt(0).toUpperCase() +
+            (invoice.orderStatus || "Pending").slice(1);
+          statusCount.set(status, (statusCount.get(status) || 0) + 1);
+
+          // Restaurant Performance
+          // const restaurant = restaurantPerformance.find(r => r.name === invoice.restaurantName) ||
+          //   { name: invoice.restaurantName, orders: 0, revenue: 0 };
+          // restaurant.orders += 1;
+          // restaurant.revenue += invoice.totalPrice || 0;
+
           // Sales Trend (last 7 days)
           const sevenDaysAgo = new Date();
           sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-          
+
           if (invoiceDate && invoiceDate >= sevenDaysAgo) {
-            const formattedDate = invoiceDate.toLocaleDateString('en-GB', { 
-              day: '2-digit', 
-              month: 'short' 
+            const formattedDate = invoiceDate.toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "short",
             });
-            
-            const existingDay = salesData.find(item => item.date === formattedDate);
+
+            const existingDay = salesData.find(
+              (item) => item.date === formattedDate
+            );
             if (existingDay) {
-              existingDay.sales += invoice.items.reduce((sum, item) => 
-                sum + (item.price * item.quantity), 0);
+              existingDay.Sales += invoice.items.reduce(
+                (sum, item) => sum + item.price * item.quantity,
+                0
+              );
             } else {
               salesData.push({
                 date: formattedDate,
-                sales: invoice.items.reduce((sum, item) => 
-                  sum + (item.price * item.quantity), 0)
+                Sales: invoice.items.reduce(
+                  (sum, item) => sum + item.price * item.quantity,
+                  0
+                ),
               });
             }
           }
@@ -86,14 +146,45 @@ const Dashboard = () => {
 
         // Sort sales data by date
         salesData.sort((a, b) => {
-          const [dayA, monthA] = a.date.split(' ');
-          const [dayB, monthB] = b.date.split(' ');
-          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
-                          'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-          return (months.indexOf(monthA) * 31 + parseInt(dayA)) - 
-                 (months.indexOf(monthB) * 31 + parseInt(dayB));
+          const [dayA, monthA] = a.date.split(" ");
+          const [dayB, monthB] = b.date.split(" ");
+          const months = [
+            "Jan",
+            "Feb",
+            "Mar",
+            "Apr",
+            "May",
+            "Jun",
+            "Jul",
+            "Aug",
+            "Sep",
+            "Oct",
+            "Nov",
+            "Dec",
+          ];
+
+          // Adjust months for year transition
+          let monthIndexA = months.indexOf(monthA);
+          let monthIndexB = months.indexOf(monthB);
+
+          // If we're comparing December with January
+          if (monthA === "Dec" && monthB === "Jan") {
+            return -1; // December should come before January
+          } else if (monthA === "Jan" && monthB === "Dec") {
+            return 1; // January should come after December
+          }
+
+          // Normal case - same year comparison
+          return (
+            monthIndexA * 31 +
+            parseInt(dayA) -
+            (monthIndexB * 31 + parseInt(dayB))
+          );
         });
 
+        setOrderStatusData(
+          Array.from(statusCount, ([name, value]) => ({ name, value }))
+        );
         setTodayOrders(ordersCount);
         setSalesTrend(salesData);
       }
@@ -101,48 +192,112 @@ const Dashboard = () => {
 
     // Total Available Metrics
     const inventoryRef = collection(db, "inventoryItems");
-    const unsubscribeTotalAvailable = onSnapshot(inventoryRef, (snapshot) => {
-      let totalAvailableItems = 0;
-      let totalAvailableCost = 0;
-      let totalAvailableQuantity = 0;
 
-      snapshot.forEach((doc) => {
-        const item = doc.data();
-        totalAvailableItems += 1;
-        totalAvailableCost += item.price * Number(item.availableQuantity) || 0;
-        totalAvailableQuantity += Number(item.availableQuantity) || 0;
-      });
+    const unsubscribeTotalAvailable = onSnapshot(
+      inventoryRef,
+      async (snapshot) => {
+        let totalAvailableItems = 0;
+        let totalAvailableCost = 0;
+        let totalAvailableQuantity = 0;
+        const lowStock = [];
+        // const categories = new Map();
 
-      setTotalAvailable({
-        items: totalAvailableItems,
-        cost: totalAvailableCost.toFixed(2),
-        quantity: totalAvailableQuantity,
-      });
-    });
+        snapshot.forEach((doc) => {
+          const item = doc.data();
+
+          totalAvailableItems += 1;
+          totalAvailableCost +=
+            parseFloat(item.price) * Number(item.availableQuantity) || 0;
+          totalAvailableQuantity += Number(item.availableQuantity) || 0;
+
+          if (Number(item.availableQuantity) <= 10) {
+            lowStock.push({
+              title: item.title,
+              quantity: Number(item.availableQuantity),
+              threshold: 10,
+            });
+          }
+        });
+
+        setTotalAvailable({
+          items: totalAvailableItems,
+          cost: totalAvailableCost.toFixed(2),
+          quantity: totalAvailableQuantity,
+        });
+        setLowStockItems(lowStock);
+
+        const categoryRef = collection(db, "inventoryCategory");
+        const categorySnapshot = await getDocs(categoryRef);
+
+        // Create a map of categories
+        const categories = categorySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          name: doc.data().category,
+        }));
+
+        // Fetch all items from `inventory`
+        const inventoryRef = collection(db, "inventoryItems");
+        const inventorySnapshot = await getDocs(inventoryRef);
+
+        // Aggregate sales for each category
+        const categoryData = categories.map((category) => {
+          const Sales = inventorySnapshot.docs
+            .filter((itemDoc) => itemDoc.data().categoryId === category.id)
+            .reduce(
+              (total, itemDoc) => total + (itemDoc.data().soldQuantity || 0),
+              0
+            );
+
+          return {
+            name: category.name,
+            Sales,
+          };
+        });
+        setCategoryData(categoryData);
+      }
+    );
 
     // Total Sold Metrics
     const unsubscribeTotalSold = onSnapshot(invoicesRef, (snapshot) => {
       let totalSoldItems = 0;
       let totalSoldCost = 0;
       let totalSoldQuantity = 0;
+      let totalPaid = 0;
+      let totalUnpaid = 0;
 
       snapshot.forEach((doc) => {
         const invoice = doc.data();
+        let invoiceTotalCost = 0;
+
+        // Calculate totals for items in this invoice
         invoice.items.forEach((item) => {
           totalSoldItems += 1;
-          totalSoldCost += item.price * Number(item.quantity) || 0;
+          const itemCost = parseFloat(item.price) * Number(item.quantity) || 0;
+          invoiceTotalCost += itemCost;
+          totalSoldCost += itemCost;
           totalSoldQuantity += Number(item.quantity) || 0;
         });
+
+        // Add to paid or unpaid total based on the invoice's orderStatus
+        if (invoice.isBillPaid === "paid") {
+          totalPaid += invoiceTotalCost;
+        } else {
+          totalUnpaid += invoiceTotalCost;
+        }
       });
 
+      // Update state with all calculated totals
       setTotalSold({
         items: totalSoldItems,
         cost: totalSoldCost.toFixed(2),
         quantity: totalSoldQuantity,
+        totalPaid: totalPaid.toFixed(2),
+        totalUnpaid: totalUnpaid.toFixed(2),
       });
     });
 
-    // Clean up listeners
+    getResturantPerformanceData();
+
     return () => {
       unsubscribeOrders();
       unsubscribeTotalAvailable();
@@ -153,8 +308,11 @@ const Dashboard = () => {
   // Combined Metrics Effect
   useEffect(() => {
     const combinedItems = (totalAvailable.items || 0) + (totalSold.items || 0);
-    const combinedCost = (parseFloat(totalAvailable.cost) || 0) + (parseFloat(totalSold.cost) || 0);
-    const combinedQuantity = (totalAvailable.quantity || 0) + (totalSold.quantity || 0);
+    const combinedCost =
+      (parseFloat(totalAvailable.cost) || 0) +
+      (parseFloat(totalSold.cost) || 0);
+    const combinedQuantity =
+      (totalAvailable.quantity || 0) + (totalSold.quantity || 0);
 
     setTotalCombined({
       items: combinedItems,
@@ -163,243 +321,199 @@ const Dashboard = () => {
     });
   }, [totalAvailable, totalSold]);
 
-  const styles = {
-    card: {
-      background: 'linear-gradient(145deg, #f0f4f8 0%, #ffffff 100%)',
-      boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-      borderRadius: '12px',
-      transition: 'transform 0.3s ease-in-out',
-      '&:hover': {
-        transform: 'scale(1.02)',
-      },
-    },
-    icon: {
-      color: '#C70039',
-      marginRight: '10px',
-      fontSize: '32px',
-    },
-    title: {
-      fontWeight: 700,
-      color: '#2c3e50',
-      display: 'flex',
-      alignItems: 'center',
-      marginBottom: '15px',
-    },
-    metricValue: {
-      fontWeight: 600,
-      color: '#2c3e50',
-    },
-  };
-
-  const CustomTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="custom-tooltip" style={{ 
-          backgroundColor: 'white', 
-          padding: '10px', 
-          border: '1px solid #ccc',
-          borderRadius: '5px'
-        }}>
-          <p className="label">{`Date: ${label}`}</p>
-          <p className="value">
-            {`Sales: £${payload[0].value.toLocaleString()}`}
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
+  const COLORS = ["#C70039", "#FFB800", "#FF8042", "#00C49F"]; // Red and Mustard theme colors
 
   return (
-    <Box sx={{ 
-      // backgroundColor: '#f4f6f9', 
-      minHeight: '110vh', 
-      // padding: '20px' 
-    }}>
-      <Header title="Restaurant Dashboard" />
-      
-      <Grid container spacing={4} padding={4} >
-        {/* Sales Trend Chart */}
-        <Grid item xs={12}>
-          <Paper 
-            elevation={3} 
-            sx={{ 
-              borderRadius: '12px', 
-              padding: '20px',
-              backgroundColor: 'white' 
-            }}
-          >
-            <Typography variant="h6" sx={styles.title}>
-              <AttachMoneyIcon sx={styles.icon} />
+    <Box sx={{ minHeight: "100vh", padding: 4, backgroundColor: "#f9f9f9" }}>
+      {/* Top Row - KPI Cards */}
+      <Grid container spacing={4} sx={{ marginBottom: 4 }}>
+        {[
+          {
+            title: "Total Revenue",
+            value: `£${totalSold.cost || 0}`,
+            icon: <PoundSterling />,
+            color: "#C70039",
+          },
+          // {
+          //   title: "Today's Orders",
+          //   value: Object.values(todayOrders).reduce((total, orders) => total + orders, 0),
+          //   icon: <ShoppingBag />,
+          //   color: "#FFB800"
+          // },
+          {
+            title: "Paid Revenue", // Updated Name
+            value: `£${totalSold.totalPaid || 0}`,
+            icon: <PoundSterling />,
+            color: "#FFB800",
+          },
+          {
+            title: "Pending Revenue", // Updated Name
+            value: `£${totalSold.totalUnpaid || 0}`,
+            icon: <PoundSterling />,
+            color: "#C70039",
+          },
+        ].map((stat, index) => (
+          <Grid item xs={12} md={4} key={index}>
+            <Card
+              sx={{
+                boxShadow: 2,
+                "&:hover": { boxShadow: 4 },
+                borderTop: `4px solid ${stat.color}`,
+              }}
+            >
+              <CardContent>
+                <Box display="flex" alignItems="center" mb={2}>
+                  <Box sx={{ color: stat.color, marginRight: 1 }}>
+                    {stat.icon}
+                  </Box>
+                  <Typography variant="h6" fontWeight="bold">
+                    {stat.title}
+                  </Typography>
+                </Box>
+                <Typography variant="h5" fontWeight="bold">
+                  {stat.value}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        ))}
+      </Grid>
+
+      {/* Charts Grid */}
+      <Grid container spacing={4}>
+        {/* Sales Trend */}
+        <Grid item xs={12} md={8}>
+          <Paper sx={{ padding: 3 }}>
+            <Typography variant="h6" mb={2} style={{ fontWeight: "bold" }}>
               Weekly Sales Trend
             </Typography>
             <ResponsiveContainer width="100%" height={300}>
-        <LineChart data={salesTrend}>
-          <XAxis dataKey="date" />
-          <YAxis />
-          <Tooltip content={<CustomTooltip />} />
-          <Line 
-            type="monotone" 
-            dataKey="sales" 
-            stroke="#C70039" 
-            strokeWidth={3}
-          />
-        </LineChart>
-      </ResponsiveContainer>
+              <LineChart data={salesTrend}>
+                <XAxis dataKey="date" />
+                <YAxis />
+                <Tooltip
+                  formatter={(value) => [
+                    `£${parseFloat(value).toFixed(2)}`,
+                    "Sales",
+                  ]}
+                  labelFormatter={(label) => (
+                    <span style={{ fontWeight: "bold" }}>{label}</span>
+                  )}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="Sales"
+                  stroke="#C70039"
+                  strokeWidth={2}
+                />
+              </LineChart>
+            </ResponsiveContainer>
           </Paper>
         </Grid>
 
-        {/* Today's Orders */}
+        {/* Order Status Distribution */}
         <Grid item xs={12} md={4}>
-          <Card sx={styles.card}>
-            <CardContent>
-              <Typography variant="h6" sx={styles.title}>
-                <RestaurantIcon sx={styles.icon} /> 
-                Today's Orders
-              </Typography>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Restaurant</TableCell>
-                    <TableCell align="right">Orders</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {Object.keys(todayOrders).length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={2} align="center">
-                        No orders today
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    Object.keys(todayOrders).map((restaurant) => (
-                      <TableRow key={restaurant}>
-                        <TableCell>{restaurant}</TableCell>
-                        <TableCell align="right">
-                          {todayOrders[restaurant] || 0}
-                        </TableCell>
-                      </TableRow>
-                    ))
+          <Paper sx={{ padding: 3 }}>
+            <Typography variant="h6" mb={2} style={{ fontWeight: "bold" }}>
+              Order Status
+            </Typography>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={orderStatusData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                  label
+                >
+                  {orderStatusData.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={COLORS[index % COLORS.length]}
+                    />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </Paper>
+        </Grid>
+
+        {/* Category Performance */}
+        <Grid item xs={12} md={12}>
+          <Paper sx={{ padding: 3 }}>
+            <Typography variant="h6" mb={2} style={{ fontWeight: "bold" }}>
+              Sales By Category
+            </Typography>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={categoryData}>
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip />
+                <Bar dataKey="Sales" fill="#FFB800" />
+              </BarChart>
+            </ResponsiveContainer>
+          </Paper>
+        </Grid>
+
+        {/* Restaurant Performance */}
+        <Grid item xs={12} md={12}>
+          <Paper sx={{ padding: 3 }}>
+            <Typography variant="h6" mb={2} fontWeight={"bold"}>
+              Performance by Restaurant
+            </Typography>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={restaurantPerformance}>
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip
+                  formatter={(value) => [
+                    `£${parseFloat(value).toFixed(2)}`,
+                    "Revenue",
+                  ]}
+                  labelFormatter={(label) => (
+                    <span style={{ fontWeight: "bold" }}>{label}</span>
                   )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+                />
+                <Bar dataKey="revenue" fill="#C70039" />
+              </BarChart>
+            </ResponsiveContainer>
+          </Paper>
         </Grid>
 
-        {/* Total Available */}
-        <Grid item xs={12} md={4}>
-          <Card sx={styles.card}>
-            <CardContent>
-              <Typography variant="h6" sx={styles.title}>
-                <StoreIcon sx={styles.icon} /> 
-                Total Available
-              </Typography>
-              <Grid container spacing={2}>
-                <Grid item xs={12}>
-                  <Box display="flex" justifyContent="space-between">
-                    <Typography>Items:</Typography>
-                    <Typography sx={styles.metricValue}>
-                      {totalAvailable.items}
-                    </Typography>
-                  </Box>
-                </Grid>
-                <Grid item xs={12}>
-                  <Box display="flex" justifyContent="space-between">
-                    <Typography>Cost:</Typography>
-                    <Typography sx={styles.metricValue}>
-                      £ {totalAvailable.cost}
-                    </Typography>
-                  </Box>
-                </Grid>
-                <Grid item xs={12}>
-                  <Box display="flex" justifyContent="space-between">
-                    <Typography>Quantity:</Typography>
-                    <Typography sx={styles.metricValue}>
-                      {totalAvailable.quantity}
-                    </Typography>
-                  </Box>
-                </Grid>
-              </Grid>
-            </CardContent>
-          </Card>
-        </Grid>
+        <TodayInvoicesGrid />
 
-        {/* Total Sold */}
-        <Grid item xs={12} md={4}>
-          <Card sx={styles.card}>
-            <CardContent>
-              <Typography variant="h6" sx={styles.title}>
-                <ShoppingCartIcon sx={styles.icon} /> 
-                Total Sold
+        {/* Low Stock Alerts Accordion */}
+        <Grid item xs={12}>
+          <Accordion>
+            <AccordionSummary
+              expandIcon={<ChevronDown />}
+              sx={{ backgroundColor: "#fff3f3" }}
+            >
+              <Typography color="error" variant="h6">
+                Low Stock Items ({lowStockItems.length})
               </Typography>
+            </AccordionSummary>
+            <AccordionDetails>
               <Grid container spacing={2}>
-                <Grid item xs={12}>
-                  <Box display="flex" justifyContent="space-between">
-                    <Typography>Items:</Typography>
-                    <Typography sx={styles.metricValue}>
-                      {totalSold.items}
-                    </Typography>
-                  </Box>
-                </Grid>
-                <Grid item xs={12}>
-                  <Box display="flex" justifyContent="space-between">
-                    <Typography>Cost:</Typography>
-                    <Typography sx={styles.metricValue}>
-                      £ {totalSold.cost}
-                    </Typography>
-                  </Box>
-                </Grid>
-                <Grid item xs={12}>
-                  <Box display="flex" justifyContent="space-between">
-                    <Typography>Quantity:</Typography>
-                    <Typography sx={styles.metricValue}>
-                      {totalSold.quantity}
-                    </Typography>
-                  </Box>
-                </Grid>
+                {lowStockItems.map((item, index) => (
+                  <Grid item xs={12} key={index}>
+                    <Alert
+                      severity="warning"
+                      sx={{ backgroundColor: "#fff3f3" }}
+                    >
+                      <AlertTitle>{item.title}</AlertTitle>
+                      Only {item.quantity} units remaining
+                    </Alert>
+                  </Grid>
+                ))}
               </Grid>
-            </CardContent>
-          </Card>
+            </AccordionDetails>
+          </Accordion>
         </Grid>
-
-        {/* Total Combined */}
-        {/* <Grid item xs={12} md={12}>
-          <Card sx={styles.card}>
-            <CardContent>
-              <Typography variant="h6" sx={styles.title}>
-                <MergeTypeIcon sx={styles.icon} /> 
-                Total Combined
-              </Typography>
-              <Grid container spacing={2}>
-                <Grid item xs={12} md={4}>
-                  <Box display="flex" justifyContent="space-between">
-                    <Typography>Items:</Typography>
-                    <Typography sx={styles.metricValue}>
-                      {totalCombined.items}
-                    </Typography>
-                  </Box>
-                </Grid>
-                <Grid item xs={12} md={4}>
-                  <Box display="flex" justifyContent="space-between">
-                    <Typography>Cost:</Typography>
-                    <Typography sx={styles.metricValue}>
-                      £ {totalCombined.cost}
-                    </Typography>
-                  </Box>
-                </Grid>
-                <Grid item xs={12} md={4}>
-                  <Box display="flex" justifyContent="space-between">
-                    <Typography>Quantity:</Typography>
-                    <Typography sx={styles.metricValue}>
-                      {totalCombined.quantity}
-                    </Typography>
-                  </Box>
-                </Grid>
-              </Grid>
-            </CardContent>
-          </Card>
-        </Grid> */}
       </Grid>
     </Box>
   );

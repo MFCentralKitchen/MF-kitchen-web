@@ -9,7 +9,7 @@ import {
   orderBy,
   where,
   getDocs,
-  getDoc
+  getDoc,
 } from "firebase/firestore";
 import { db } from "../firebase-config";
 import {
@@ -40,6 +40,7 @@ import {
 import { Eye, Trash2, Search } from "lucide-react";
 import InvoiceModal from "../components/invoice-modal";
 import Header from "../components/header";
+import { Input, Widgets } from "@mui/icons-material";
 
 const InvoiceScreen = () => {
   const [invoices, setInvoices] = useState([]);
@@ -126,8 +127,6 @@ const InvoiceScreen = () => {
       console.error("Error updating payment status:", error);
     }
   };
-
-  
 
   const handleDelete = async () => {
     const updateSoldQuantity = async (item) => {
@@ -246,27 +245,31 @@ const InvoiceScreen = () => {
     <Box sx={{ backgroundColor: "#FFFAE1", minHeight: "100vh" }}>
       <Header title="Invoices" />
 
-      <Stack spacing={3}>
+      <Stack >
         <Stack
           direction="row"
           spacing={2}
           alignItems="center"
-          style={{ margin: "10px 10px 0px 10px" }}
+          sx={{
+            margin: "5px 10px 0px 10px", // Reduce vertical margin
+            padding: "5px", // Optional: Add padding for consistent spacing
+          }}
         >
-          <TextField
-            label="Search by Restaurant"
-            variant="outlined"
-            fullWidth
+          {/* <Input label={"search by restaurant"} variant={'outlined'} value={searchQuery} onChange={handleSearch} style={{width:'70px', backgroundColor:'red'}} /> */}
+          <input
+            label={"search by restaurant"}
             value={searchQuery}
             onChange={handleSearch}
-            InputProps={{
-              startAdornment: (
-                <Search size={20} color="#666" style={{ marginRight: 8 }} />
-              ),
+            placeholder="search by restaurant"
+            style={{
+              width: "100%",
+              height: "30px",
+              borderRadius: "4px",
+              borderWidth: "1px",
+              borderColor: "black",
+              paddingLeft: "10px",
             }}
-            sx={{ backgroundColor: "white", borderRadius: 1 }}
           />
-
           <Button
             variant="contained"
             color="error"
@@ -276,8 +279,9 @@ const InvoiceScreen = () => {
               setDeleteType("multiple");
             }}
             startIcon={<Trash2 size={20} />}
+            sx={{ height: "40px" }} // Match TextField height for consistency
           >
-            Delete Selected
+            Delete
           </Button>
         </Stack>
 
