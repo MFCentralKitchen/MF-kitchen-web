@@ -7,7 +7,7 @@ import {
   orderBy,
   doc,
   updateDoc,
-  onSnapshot
+  onSnapshot,
 } from "firebase/firestore";
 import { db } from "../firebase-config";
 import html2pdf from "html2pdf.js";
@@ -105,7 +105,7 @@ const ConsolidatedInvoiceView = () => {
       where("userId", "==", restaurantId),
       orderBy("createdAt", "asc")
     );
-  
+
     // Listen to real-time updates
     const unsubscribe = onSnapshot(
       q,
@@ -114,7 +114,7 @@ const ConsolidatedInvoiceView = () => {
           id: doc.id,
           ...doc.data(),
         }));
-  
+
         const groupedInvoices = groupInvoicesByPeriod(invoices);
         setConsolidatedInvoices(groupedInvoices);
         setLoading(false); // Stop loading after data is received
@@ -124,7 +124,7 @@ const ConsolidatedInvoiceView = () => {
         setLoading(false); // Stop loading even if there’s an error
       }
     );
-  
+
     // Return the unsubscribe function for cleanup
     return unsubscribe;
   };
@@ -137,12 +137,12 @@ const ConsolidatedInvoiceView = () => {
       const year = date.getFullYear();
       const month = date.getMonth();
       const day = date.getDate();
-      const period = day <= 15 ? "first" : "second";
+      const period = day <= 14 ? "first" : "second";
 
       const key = `${year}-${month}-${period}`;
       if (!grouped[key]) {
         grouped[key] = {
-          period: period === "first" ? "1-15" : "16-end",
+          period: period === "first" ? "1-14" : "15-end",
           month: date.toLocaleString("default", { month: "long" }),
           year,
           invoices: [],
@@ -151,10 +151,10 @@ const ConsolidatedInvoiceView = () => {
           startDate:
             period === "first"
               ? new Date(year, month, 1)
-              : new Date(year, month, 16),
+              : new Date(year, month, 15),
           endDate:
             period === "first"
-              ? new Date(year, month, 15)
+              ? new Date(year, month, 14)
               : new Date(year, month + 1, 0),
           isPaid: true, // Initialize as true for payment status
         };
@@ -170,13 +170,8 @@ const ConsolidatedInvoiceView = () => {
       grouped[key].totalItems += invoice.items ? invoice.items.length : 0;
 
       // Update payment status
-      console.log(invoice.isBillPaid, "PAYMENT STATUS");
-      if (invoice.isBillPaid) {
-        grouped[key].isPaid = true;
-        setPaymentStatus('Paid')
-      }else{
+      if (!invoice.isBillPaid) {
         grouped[key].isPaid = false;
-        setPaymentStatus('Pending')
       }
     });
 
@@ -186,7 +181,7 @@ const ConsolidatedInvoiceView = () => {
         ...group,
         paymentStatus: group.isPaid ? "Paid" : "Pending",
       }))
-      .sort((a, b) => b.endDate - a.endDate);
+      .sort((a, b) => b.endDate - a.endDate); // Sort by endDate in descending order
   };
 
   const handleDownloadPDF = async () => {
@@ -255,9 +250,9 @@ const ConsolidatedInvoiceView = () => {
 
   const handlePaymentStatusChange = async (newStatus) => {
     setPaymentStatus(newStatus); // Update local state for immediate UI response
-  
+
     const isPaid = newStatus === "Paid";
-  
+
     try {
       // Update each invoice record in Firestore
       await Promise.all(
@@ -266,7 +261,7 @@ const ConsolidatedInvoiceView = () => {
           return updateDoc(invoiceDocRef, { isBillPaid: isPaid }); // Update the document
         })
       );
-  
+
       // Reflect changes in the UI
       setSelectedInvoiceGroup((prev) => ({
         ...prev,
@@ -275,16 +270,18 @@ const ConsolidatedInvoiceView = () => {
           isBillPaid: isPaid,
         })),
       }));
-      console.log(isPaid,"jhuygaddahjbguyi")
+      console.log(isPaid, "jhuygaddahjbguyi");
     } catch (error) {
       console.error("Error updating payment status: ", error);
     }
   };
-  
+
   useEffect(() => {
     setLoading(true);
-    const unsubscribe = fetchInvoices(selectedRestaurant?.id ? selectedRestaurant?.id :"");
-  
+    const unsubscribe = fetchInvoices(
+      selectedRestaurant?.id ? selectedRestaurant?.id : ""
+    );
+
     // Cleanup on component unmount
     return () => unsubscribe();
   }, [selectedRestaurant]);
@@ -675,12 +672,14 @@ const ConsolidatedInvoiceView = () => {
                       >
                         {group.month} {group.year}
                       </TableCell>
+
                       {/* Period */}
                       <TableCell
                         style={{ fontSize: "0.875rem", color: "#4A5568" }}
                       >
-                        {group.period === "first" ? "1st - 15th" : "16th - End"}
+                        {group.period === "1-14" ? "1st - 14th" : "15th - End"}
                       </TableCell>
+
                       {/* Total Invoices */}
                       <TableCell
                         style={{ fontSize: "0.875rem", color: "#4A5568" }}
@@ -698,6 +697,7 @@ const ConsolidatedInvoiceView = () => {
                           {group.invoices.length}
                         </div>
                       </TableCell>
+
                       {/* Total Amount */}
                       <TableCell
                         style={{ fontSize: "0.875rem", color: "#4A5568" }}
@@ -720,6 +720,8 @@ const ConsolidatedInvoiceView = () => {
                           </Typography>
                         </div>
                       </TableCell>
+
+                      {/* Payment Status */}
                       <TableCell
                         style={{
                           fontSize: "0.875rem",
@@ -732,6 +734,7 @@ const ConsolidatedInvoiceView = () => {
                       >
                         {group.paymentStatus}
                       </TableCell>
+
                       {/* Action */}
                       <TableCell align="center">
                         <Button

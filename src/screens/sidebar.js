@@ -22,7 +22,7 @@ const Sidebar = () => {
     setIsOpen(!isOpen);
   };
 
-  const drawerWidth = isMobile ? '240px' : '250px';
+  const drawerWidth = isMobile ? '20%' : '18%';
   
   const menuItems = [
     { path: '/dashboard', icon: DashboardIcon, text: 'Dashboard' },
@@ -53,7 +53,7 @@ const Sidebar = () => {
       margin: '0 auto',
     },
     menuItem: (isItemActive) => ({
-      margin: '8px 16px',
+      margin: '8px 0px',
       borderRadius: '8px',
       backgroundColor: isItemActive ? '#F5B300' : 'transparent',
       '&:hover': {

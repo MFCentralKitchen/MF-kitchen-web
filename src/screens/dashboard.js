@@ -33,6 +33,7 @@ import {
   ShoppingBag,
   ChevronDown,
   PoundSterling,
+  ClipboardX
 } from "lucide-react";
 import { collection, query, onSnapshot, getDocs } from "firebase/firestore";
 import { db } from "../firebase-config";
@@ -49,6 +50,9 @@ const Dashboard = () => {
   const [totalAvailable, setTotalAvailable] = useState({});
   const [totalSold, setTotalSold] = useState({});
   const [totalCombined, setTotalCombined] = useState({});
+  const [todayRestaurantOrders, setTodayRestaurantOrders] = useState([]);
+  const [restaurantUnpaidRevenue, setRestaurantUnpaidRevenue] = useState([]);
+
   const getChartHeight = () => {
     return window.innerWidth <= 768 ? 200 : 300;
   };
@@ -81,6 +85,8 @@ const Dashboard = () => {
       const ordersCount = {};
       const salesData = [];
       const statusCount = new Map();
+      const restaurantOrders = new Map();
+      const restaurantUnpaid = new Map();
 
       if (!snapshot.empty) {
         snapshot.forEach((doc) => {
@@ -92,6 +98,28 @@ const Dashboard = () => {
             invoiceDate = new Date(createdAt.seconds * 1000);
           } else if (typeof createdAt === "string") {
             invoiceDate = new Date(createdAt);
+          }
+
+          // Today's Restaurant Orders
+          if (invoiceDate && invoiceDate >= todayStart) {
+            if (invoice.restaurantName) {
+              restaurantOrders.set(
+                invoice.restaurantName,
+                (restaurantOrders.get(invoice.restaurantName) || 0) + 1
+              );
+            }
+          }
+
+          // Restaurant Unpaid Revenue
+          if (invoice.isBillPaid !== "paid" && invoice.restaurantName) {
+            const invoiceTotal = invoice.items.reduce(
+              (sum, item) => sum + (item.price * item.quantity || 0),
+              0
+            );
+            restaurantUnpaid.set(
+              invoice.restaurantName,
+              (restaurantUnpaid.get(invoice.restaurantName) || 0) + invoiceTotal
+            );
           }
 
           // Today's Orders
@@ -187,6 +215,20 @@ const Dashboard = () => {
         );
         setTodayOrders(ordersCount);
         setSalesTrend(salesData);
+         // Convert Map to array format for charts
+         setTodayRestaurantOrders(
+          Array.from(restaurantOrders, ([name, orders]) => ({
+            name,
+            orders,
+          }))
+        );
+
+        setRestaurantUnpaidRevenue(
+          Array.from(restaurantUnpaid, ([name, unpaid]) => ({
+            name,
+            unpaid: parseFloat(unpaid.toFixed(2)),
+          }))
+        );
       }
     });
 
@@ -321,6 +363,42 @@ const Dashboard = () => {
     });
   }, [totalAvailable, totalSold]);
 
+  const TodayOrdersChart = ({ data }) => {
+    if (!data || data.length === 0) {
+      return (
+        <Box
+          sx={{
+            height: 300,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 2,
+          }}
+        >
+          <ClipboardX size={48} color="#FFB800" />
+          <Typography variant="h6" color="text.secondary" align="center">
+            No orders received today
+          </Typography>
+          <Typography variant="body2" color="text.secondary" align="center">
+            New orders will appear here as they come in
+          </Typography>
+        </Box>
+      );
+    }
+
+    return (
+      <ResponsiveContainer width="100%" height={300}>
+        <BarChart data={data}>
+          <XAxis dataKey="name" />
+          <YAxis />
+          <Tooltip />
+          <Bar dataKey="orders" fill="#FFB800" />
+        </BarChart>
+      </ResponsiveContainer>
+    );
+  };
+
   const COLORS = ["#C70039", "#FFB800", "#FF8042", "#00C49F"]; // Red and Mustard theme colors
 
   return (
@@ -442,6 +520,35 @@ const Dashboard = () => {
           </Paper>
         </Grid>
 
+         {/* Today's Orders by Restaurant */}
+         <Grid item xs={12} md={6}>
+          <Paper sx={{ padding: 3 }}>
+            <Typography variant="h6" mb={2} style={{ fontWeight: "bold" }}>
+              Today's Orders by Restaurant
+            </Typography>
+            <TodayOrdersChart data={todayRestaurantOrders} />
+          </Paper>
+        </Grid>
+
+        {/* Restaurant Unpaid Revenue */}
+        <Grid item xs={12} md={6}>
+          <Paper sx={{ padding: 3 }}>
+            <Typography variant="h6" mb={2} style={{ fontWeight: "bold" }}>
+              Pending Revenue by Restaurant
+            </Typography>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={restaurantUnpaidRevenue}>
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip 
+                  formatter={(value) => [`£${value}`, "Pending Amount"]}
+                />
+                <Bar dataKey="unpaid" fill="#C70039" />
+              </BarChart>
+            </ResponsiveContainer>
+          </Paper>
+        </Grid>
+
         {/* Category Performance */}
         <Grid item xs={12} md={12}>
           <Paper sx={{ padding: 3 }}>
@@ -485,6 +592,7 @@ const Dashboard = () => {
         </Grid>
 
         <TodayInvoicesGrid />
+        
 
         {/* Low Stock Alerts Accordion */}
         <Grid item xs={12}>

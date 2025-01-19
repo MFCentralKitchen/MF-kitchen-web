@@ -1,5 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { getFirestore, collection, getDocs, query, where } from "firebase/firestore";
+import {
+  getFirestore,
+  collection,
+  getDocs,
+  query,
+  where,
+} from "firebase/firestore";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import html2canvas from "html2canvas";
@@ -112,9 +118,9 @@ const TodayInvoicesGrid = () => {
     const doc = new jsPDF({
       orientation: "landscape",
       unit: "mm",
-      format: "a3" // Changed to A3 for more space
+      format: "a3", // Changed to A3 for more space
     });
-    
+
     const headers = ["Item", ...data.map((d) => d.restaurantName)];
     const rows = [];
 
@@ -122,26 +128,34 @@ const TodayInvoicesGrid = () => {
       const row = [item.title];
       data.forEach((restaurant) => {
         const quantity =
-          restaurant.itemQuantities.find(
-            (q) => q.title === item.title
-          )?.quantity || "";
+          restaurant.itemQuantities.find((q) => q.title === item.title)
+            ?.quantity || "";
         row.push(quantity);
       });
       rows.push(row);
     });
 
     // Calculate optimal column widths based on content
-    const maxRestaurantNameLength = Math.max(...data.map(d => d.restaurantName.length));
-    const maxItemNameLength = Math.max(...items.map(item => item.title.length));
-    
+    const maxRestaurantNameLength = Math.max(
+      ...data.map((d) => d.restaurantName.length)
+    );
+    const maxItemNameLength = Math.max(
+      ...items.map((item) => item.title.length)
+    );
+
     // Base column widths
     const itemColumnWidth = Math.min(Math.max(maxItemNameLength * 2, 25), 50); // Min 25mm, Max 50mm
     // const restaurantColumnWidth = Math.min(Math.max(maxRestaurantNameLength * 1.8, 20), 35); // Min 20mm, Max 35mm
-    const restaurantColumnWidth = Math.min(Math.max(maxRestaurantNameLength * 1.4, 14), 26)
+    const restaurantColumnWidth = Math.min(
+      Math.max(maxRestaurantNameLength * 1.4, 14),
+      26
+    );
 
     // Set title with bigger font
     doc.setFontSize(20);
-    doc.text("Today's Invoice Grid", doc.internal.pageSize.getWidth() / 2, 15, { align: "center" });
+    doc.text("Today's Invoice Grid", doc.internal.pageSize.getWidth() / 2, 15, {
+      align: "center",
+    });
 
     // Add timestamp
     doc.setFontSize(10);
@@ -156,33 +170,34 @@ const TodayInvoicesGrid = () => {
       styles: {
         fontSize: 9,
         cellPadding: 2,
-        overflow: 'linebreak',
-        cellWidth: 'wrap',
-        halign: 'center', // Center align all cells
+        overflow: "linebreak",
+        cellWidth: "wrap",
+        halign: "center", // Center align all cells
       },
       headStyles: {
         fillColor: [220, 38, 38],
         textColor: 255,
-        fontStyle: 'bold',
-        halign: 'center',
+        fontStyle: "bold",
+        halign: "center",
       },
       columnStyles: {
-        0: { // Item column
+        0: {
+          // Item column
           cellWidth: itemColumnWidth,
-          fontStyle: 'bold',
-          halign: 'left',
+          fontStyle: "bold",
+          halign: "left",
         },
         ...Object.fromEntries(
           Array.from({ length: headers.length - 1 }, (_, i) => [
             i + 1,
             {
               cellWidth: restaurantColumnWidth,
-              halign: 'center',
-            }
+              halign: "center",
+            },
           ])
         ),
       },
-      didDrawPage: function(data) {
+      didDrawPage: function (data) {
         // Add page number
         doc.setFontSize(10);
         doc.text(
@@ -192,9 +207,9 @@ const TodayInvoicesGrid = () => {
         );
       },
       margin: { top: 25, right: 15, bottom: 15, left: 15 },
-      theme: 'grid',
-      tableWidth: 'auto',
-      didDrawCell: function(data) {
+      theme: "grid",
+      tableWidth: "auto",
+      didDrawCell: function (data) {
         // Add extra styling for header cells if needed
         if (data.row.index === 0) {
           doc.setTextColor(255, 255, 255);
@@ -222,7 +237,12 @@ const TodayInvoicesGrid = () => {
 
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight={300}>
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        minHeight={300}
+      >
         <CircularProgress color="primary" />
       </Box>
     );
@@ -231,17 +251,18 @@ const TodayInvoicesGrid = () => {
   if (!data.length) {
     return (
       <Box p={2}>
-        <Alert 
+        <Alert
           severity="warning"
           icon={<WarningIcon />}
-          sx={{ 
-            '& .MuiAlert-icon': {
-              color: theme.palette.primary.main
-            }
+          sx={{
+            "& .MuiAlert-icon": {
+              color: theme.palette.primary.main,
+            },
           }}
         >
           <AlertTitle>No Orders Found</AlertTitle>
-          There are no orders for today. New orders will appear here as they come in.
+          There are no orders for today. New orders will appear here as they
+          come in.
         </Alert>
       </Box>
     );
@@ -249,7 +270,15 @@ const TodayInvoicesGrid = () => {
 
   return (
     <ThemeProvider theme={theme}>
-      <Paper elevation={3} sx={{ width: "92%", p: 3,marginLeft:'3.5%' ,marginTop:'15px'}}>
+      <Paper
+        elevation={3}
+        sx={{
+          p: 3,
+          marginLeft: "3.5%",
+          marginTop: "15px",
+          maxWidth: "95%", // Prevent the paper from extending beyond screen
+        }}
+      >
         <Typography
           variant="h4"
           color="primary"
@@ -259,13 +288,31 @@ const TodayInvoicesGrid = () => {
         >
           Today's Invoice Grid
         </Typography>
-        <Box sx={{ width: "100%", overflow: "auto" }}>
-          <table 
-            id="invoice-table" 
-            style={{ 
-              minWidth: "100%", 
+
+        {/* Table Container */}
+        <Box
+          sx={{
+            width: "100%",
+            overflowX: "auto",
+            "&::-webkit-scrollbar": {
+              height: "8px",
+            },
+            "&::-webkit-scrollbar-track": {
+              backgroundColor: "#f1f1f1",
+            },
+            "&::-webkit-scrollbar-thumb": {
+              backgroundColor: "#888",
+              borderRadius: "4px",
+            },
+          }}
+        >
+          <table
+            id="invoice-table"
+            style={{
+              minWidth: "100%",
+              width: "max-content",
               borderCollapse: "collapse",
-              whiteSpace: "nowrap"
+              borderSpacing: 0,
             }}
           >
             <thead>
@@ -279,7 +326,9 @@ const TodayInvoicesGrid = () => {
                     color: "white",
                     padding: "16px",
                     border: "1px solid #ddd",
-                    minWidth: "200px",
+                    minWidth: "200px", // Increased minimum width for item column
+                    whiteSpace: "normal", // Allow text wrapping
+                    wordWrap: "break-word",
                   }}
                 >
                   Item
@@ -292,50 +341,154 @@ const TodayInvoicesGrid = () => {
                       color: "white",
                       padding: "16px",
                       border: "1px solid #ddd",
-                      minWidth: "150px",
+                      minWidth: "150px", // Fixed width for restaurant columns
+                      maxWidth: "200px",
+                      whiteSpace: "normal", // Allow text wrapping
+                      wordWrap: "break-word",
                     }}
                   >
                     {restaurant.restaurantName}
                   </th>
                 ))}
+                <th
+                  style={{
+                    backgroundColor: theme.palette.primary.main,
+                    color: "white",
+                    padding: "16px",
+                    border: "1px solid #ddd",
+                    minWidth: "100px",
+                    position: "sticky",
+                    right: 0,
+                    zIndex: 2,
+                  }}
+                >
+                  Total
+                </th>
               </tr>
             </thead>
             <tbody>
-              {items.map((item, index) => (
-                <tr key={index}>
-                  <td
-                    style={{
-                      position: "sticky",
-                      left: 0,
-                      backgroundColor: "white",
-                      padding: "16px",
-                      border: "1px solid #ddd",
-                      fontWeight: "500",
-                      zIndex: 1,
-                    }}
-                  >
-                    {item.title}
-                  </td>
-                  {data.map((restaurant, i) => (
+              {items.map((item, index) => {
+                const total = data.reduce((sum, restaurant) => {
+                  const quantity = restaurant.itemQuantities.find(
+                    (q) => q.title === item.title
+                  )?.quantity || 0;
+                  return sum + quantity;
+                }, 0);
+
+                return (
+                  <tr key={index}>
+                    <td
+                      style={{
+                        position: "sticky",
+                        left: 0,
+                        backgroundColor: "white",
+                        padding: "16px",
+                        border: "1px solid #ddd",
+                        fontWeight: "500",
+                        zIndex: 1,
+                        minWidth: "200px",
+                        whiteSpace: "normal",
+                        wordWrap: "break-word",
+                      }}
+                    >
+                      {item.title}
+                    </td>
+                    {data.map((restaurant, i) => (
+                      <td
+                        key={i}
+                        style={{
+                          padding: "16px",
+                          border: "1px solid #ddd",
+                          textAlign: "center",
+                          backgroundColor: "white",
+                          minWidth: "150px",
+                        }}
+                      >
+                        {restaurant.itemQuantities.find(
+                          (q) => q.title === item.title
+                        )?.quantity || "-"}
+                      </td>
+                    ))}
+                    <td
+                      style={{
+                        padding: "16px",
+                        border: "1px solid #ddd",
+                        textAlign: "center",
+                        backgroundColor: "#f0f0f0",
+                        fontWeight: "bold",
+                        position: "sticky",
+                        right: 0,
+                        zIndex: 1,
+                      }}
+                    >
+                      {total}
+                    </td>
+                  </tr>
+                );
+              })}
+              <tr>
+                <td
+                  style={{
+                    position: "sticky",
+                    left: 0,
+                    backgroundColor: "#f0f0f0",
+                    fontWeight: "bold",
+                    padding: "16px",
+                    border: "1px solid #ddd",
+                    zIndex: 1,
+                  }}
+                >
+                  Total
+                </td>
+                {data.map((restaurant, i) => {
+                  const total = items.reduce((sum, item) => {
+                    const quantity = restaurant.itemQuantities.find(
+                      (q) => q.title === item.title
+                    )?.quantity || 0;
+                    return sum + quantity;
+                  }, 0);
+                  return (
                     <td
                       key={i}
                       style={{
                         padding: "16px",
                         border: "1px solid #ddd",
                         textAlign: "center",
-                        backgroundColor: "white",
+                        backgroundColor: "#f0f0f0",
+                        fontWeight: "bold",
                       }}
                     >
-                      {restaurant.itemQuantities.find(
-                        (q) => q.title === item.title
-                      )?.quantity || "-"}
+                      {total}
                     </td>
-                  ))}
-                </tr>
-              ))}
+                  );
+                })}
+                <td
+                  style={{
+                    padding: "16px",
+                    border: "1px solid #ddd",
+                    textAlign: "center",
+                    backgroundColor: "#e0e0e0",
+                    fontWeight: "bold",
+                    position: "sticky",
+                    right: 0,
+                    zIndex: 1,
+                  }}
+                >
+                  {items.reduce((grandTotal, item) => {
+                    const itemTotal = data.reduce((sum, restaurant) => {
+                      const quantity = restaurant.itemQuantities.find(
+                        (q) => q.title === item.title
+                      )?.quantity || 0;
+                      return sum + quantity;
+                    }, 0);
+                    return grandTotal + itemTotal;
+                  }, 0)}
+                </td>
+              </tr>
             </tbody>
           </table>
         </Box>
+
         <Box sx={{ display: "flex", justifyContent: "center", gap: 2, mt: 3 }}>
           <Button
             variant="contained"
@@ -355,7 +508,7 @@ const TodayInvoicesGrid = () => {
           </Button>
         </Box>
       </Paper>
-    </ThemeProvider>
+     </ThemeProvider>
   );
 };
 

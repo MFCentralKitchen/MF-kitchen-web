@@ -20,7 +20,7 @@ const Header = ({title}) => {
         alignItems: "center",
         padding: "20px",
         justifyContent: "space-between", // Ensures space between items
-        width:isMobile ? '100%' :'102%',
+        width:isMobile ? '100%' :'100%',
         marginLeft:-8,
         marginTop:-7,
         backgroundColor: "#f8f4e1", 

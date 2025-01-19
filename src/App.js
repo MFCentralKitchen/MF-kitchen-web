@@ -11,7 +11,7 @@ import Dashboard from "./screens/dashboard";
 import ManageUsers from "./screens/manage-users";
 import ConsolidatedInvoiceScreen from "./screens/ConsolidatedInvoiceScreen";
 import "@fontsource/roboto";
-import { createTheme, ThemeProvider } from "@mui/material";
+import { createTheme, ThemeProvider, useMediaQuery } from "@mui/material";
 import CssBaseline from "@mui/material/CssBaseline";
 
 const theme = createTheme({
@@ -22,6 +22,7 @@ const theme = createTheme({
 
 const App = () => {
   const { isAuthenticated } = useContext(AuthContext);
+  const isMobile = useMediaQuery("(max-width:768px)");
 
   return (
     <ThemeProvider theme={theme}>
@@ -34,7 +35,7 @@ const App = () => {
               element={
                 <div style={{ display: "flex" }}>
                   <Sidebar />
-                  <main style={{ width: "100%" }}>
+                  <main style={{ width:isMobile ? '80%' : '82%' }}>
                     <Routes>
                       <Route path="/add-users" element={<AddUsers />} />
                       <Route path="/inventory" element={<Inventory />} />

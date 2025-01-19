@@ -351,7 +351,7 @@ const Inventory = () => {
   );
 
   return (
-    <Box sx={{ backgroundColor: "#FFFAE1", color: "#C70A0A", width: "100%" }}>
+    <Box sx={{ backgroundColor: "#FFFAE1", color: "#C70A0A",}}>
       <Header title="Inventory" />
       <Grid container spacing={3} alignItems="center">
         <Grid item xs={12} md={5} margin={1}>
