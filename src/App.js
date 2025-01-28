@@ -35,7 +35,7 @@ const App = () => {
               element={
                 <div style={{ display: "flex" }}>
                   <Sidebar />
-                  <main style={{ width:isMobile ? '80%' : '82%' }}>
+                  <main style={{ width:isMobile ? '100%' : '82%' }}>
                     <Routes>
                       <Route path="/add-users" element={<AddUsers />} />
                       <Route path="/inventory" element={<Inventory />} />

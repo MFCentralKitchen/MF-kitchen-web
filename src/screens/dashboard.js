@@ -11,6 +11,12 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
 } from "@mui/material";
 import {
   BarChart,
@@ -33,7 +39,7 @@ import {
   ShoppingBag,
   ChevronDown,
   PoundSterling,
-  ClipboardX
+  ClipboardX,
 } from "lucide-react";
 import { collection, query, onSnapshot, getDocs } from "firebase/firestore";
 import { db } from "../firebase-config";
@@ -111,7 +117,7 @@ const Dashboard = () => {
           }
 
           // Restaurant Unpaid Revenue
-          if (invoice.isBillPaid !== "paid" && invoice.restaurantName) {
+          if (!invoice.isBillPaid && invoice.restaurantName) {
             const invoiceTotal = invoice.items.reduce(
               (sum, item) => sum + (item.price * item.quantity || 0),
               0
@@ -215,8 +221,8 @@ const Dashboard = () => {
         );
         setTodayOrders(ordersCount);
         setSalesTrend(salesData);
-         // Convert Map to array format for charts
-         setTodayRestaurantOrders(
+        // Convert Map to array format for charts
+        setTodayRestaurantOrders(
           Array.from(restaurantOrders, ([name, orders]) => ({
             name,
             orders,
@@ -321,11 +327,12 @@ const Dashboard = () => {
         });
 
         // Add to paid or unpaid total based on the invoice's orderStatus
-        if (invoice.isBillPaid === "paid") {
+        if (invoice.isBillPaid) {
           totalPaid += invoiceTotalCost;
         } else {
           totalUnpaid += invoiceTotalCost;
         }
+        // console.log(invoiceTotalCost,"ITS TOTAL COST",totalPaid)
       });
 
       // Update state with all calculated totals
@@ -363,16 +370,43 @@ const Dashboard = () => {
     });
   }, [totalAvailable, totalSold]);
 
+  const TodayOrdersTable = ({ data }) => {
+    return (
+      <TableContainer component={Paper}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell style={{ fontWeight: "bold" }}>
+                Restaurant Name
+              </TableCell>
+              <TableCell style={{ fontWeight: "bold" }} align="right">
+                Orders
+              </TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {data.map((row) => (
+              <TableRow key={row.name}>
+                <TableCell>{row.name}</TableCell>
+                <TableCell align="right">{row.orders}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    );
+  };
+
   const TodayOrdersChart = ({ data }) => {
     if (!data || data.length === 0) {
       return (
         <Box
           sx={{
             height: 300,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
             gap: 2,
           }}
         >
@@ -520,18 +554,18 @@ const Dashboard = () => {
           </Paper>
         </Grid>
 
-         {/* Today's Orders by Restaurant */}
-         <Grid item xs={12} md={6}>
+        {/* Today's Orders by Restaurant */}
+        <Grid item xs={12} md={12}>
           <Paper sx={{ padding: 3 }}>
             <Typography variant="h6" mb={2} style={{ fontWeight: "bold" }}>
               Today's Orders by Restaurant
             </Typography>
-            <TodayOrdersChart data={todayRestaurantOrders} />
+            <TodayOrdersTable data={todayRestaurantOrders} />
           </Paper>
         </Grid>
 
         {/* Restaurant Unpaid Revenue */}
-        <Grid item xs={12} md={6}>
+        <Grid item xs={12} md={12}>
           <Paper sx={{ padding: 3 }}>
             <Typography variant="h6" mb={2} style={{ fontWeight: "bold" }}>
               Pending Revenue by Restaurant
@@ -540,7 +574,7 @@ const Dashboard = () => {
               <BarChart data={restaurantUnpaidRevenue}>
                 <XAxis dataKey="name" />
                 <YAxis />
-                <Tooltip 
+                <Tooltip
                   formatter={(value) => [`£${value}`, "Pending Amount"]}
                 />
                 <Bar dataKey="unpaid" fill="#C70039" />
@@ -592,7 +626,6 @@ const Dashboard = () => {
         </Grid>
 
         <TodayInvoicesGrid />
-        
 
         {/* Low Stock Alerts Accordion */}
         <Grid item xs={12}>

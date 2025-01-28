@@ -122,6 +122,7 @@ const InvoiceScreen = () => {
     try {
       const invoiceRef = doc(db, "invoices", invoiceId);
       await updateDoc(invoiceRef, { isBillPaid: isPaid });
+      console.log(invoiceRef,"its ref",invoiceId)
       setEditingInvoiceId(null);
     } catch (error) {
       console.error("Error updating payment status:", error);
@@ -243,7 +244,7 @@ const InvoiceScreen = () => {
 
   return (
     <Box sx={{ backgroundColor: "#FFFAE1", minHeight: "100vh" }}>
-      <Header title="Invoices" />
+      <Header title="Orders" />
 
       <Stack >
         <Stack
@@ -403,7 +404,7 @@ const InvoiceScreen = () => {
                       <TableCell>{`#${invoice.id}`}</TableCell>
                       <TableCell>{invoice.name}</TableCell>
                       <TableCell>{invoice.restaurantName}</TableCell>
-                      <TableCell>£ {invoice.totalPrice}</TableCell>
+                      <TableCell>£ {invoice.totalPrice.toFixed(2)}</TableCell>
                       <TableCell>
                         {new Date(invoice.createdAt).toLocaleString()}
                       </TableCell>

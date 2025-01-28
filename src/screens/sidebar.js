@@ -22,7 +22,7 @@ const Sidebar = () => {
     setIsOpen(!isOpen);
   };
 
-  const drawerWidth = isMobile ? '20%' : '18%';
+  const drawerWidth = isMobile ? '45%' : '18%';
   
   const menuItems = [
     { path: '/dashboard', icon: DashboardIcon, text: 'Dashboard' },
