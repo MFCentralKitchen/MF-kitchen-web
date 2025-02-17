@@ -1003,7 +1003,7 @@ const ConsolidatedInvoiceView = () => {
                                 gap: "8px",
                               }}
                             >
-                              <Receipt sx={{ color: "#F97316" }} />
+                              {/* <Receipt sx={{ color: "#F97316" }} /> */}
                               {invoice.id}
                             </div>
                           </TableCell>

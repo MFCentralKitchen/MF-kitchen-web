@@ -118,51 +118,52 @@ const TodayInvoicesGrid = () => {
     const doc = new jsPDF({
       orientation: "landscape",
       unit: "mm",
-      format: "a3", // Changed to A3 for more space
+      format: "a3", // Ensure enough space for all columns
     });
-
-    const headers = ["Item", ...data.map((d) => d.restaurantName)];
+  
+    // Add the "Total" column in the header
+    const headers = ["Item", ...data.map((d) => d.restaurantName), "Total"];
     const rows = [];
-
+  
     items.forEach((item) => {
       const row = [item.title];
+  
+      let rowTotal = 0; // Track total for this item
+  
       data.forEach((restaurant) => {
         const quantity =
           restaurant.itemQuantities.find((q) => q.title === item.title)
-            ?.quantity || "";
+            ?.quantity || 0;
         row.push(quantity);
+        rowTotal += quantity; // Add to total
       });
+  
+      row.push(rowTotal); // Add total column value
       rows.push(row);
     });
-
-    // Calculate optimal column widths based on content
+  
+    // Column width calculations
     const maxRestaurantNameLength = Math.max(
       ...data.map((d) => d.restaurantName.length)
     );
-    const maxItemNameLength = Math.max(
-      ...items.map((item) => item.title.length)
-    );
-
-    // Base column widths
-    const itemColumnWidth = Math.min(Math.max(maxItemNameLength * 2, 25), 50); // Min 25mm, Max 50mm
-    // const restaurantColumnWidth = Math.min(Math.max(maxRestaurantNameLength * 1.8, 20), 35); // Min 20mm, Max 35mm
-    const restaurantColumnWidth = Math.min(
-      Math.max(maxRestaurantNameLength * 1.4, 14),
-      26
-    );
-
-    // Set title with bigger font
+    const maxItemNameLength = Math.max(...items.map((item) => item.title.length));
+  
+    const itemColumnWidth = Math.min(Math.max(maxItemNameLength * 2, 25), 60);
+    const restaurantColumnWidth = Math.min(Math.max(maxRestaurantNameLength * 1.4, 14), 26);
+    const totalColumnWidth = 30; // Fixed width for the total column
+  
+    // Set title
     doc.setFontSize(20);
     doc.text("Today's Invoice Grid", doc.internal.pageSize.getWidth() / 2, 15, {
       align: "center",
     });
-
+  
     // Add timestamp
     doc.setFontSize(10);
     const timestamp = new Date().toLocaleString();
     doc.text(`Generated: ${timestamp}`, 10, 10);
-
-    // Configure table with optimized settings
+  
+    // Generate the table
     doc.autoTable({
       head: [headers],
       body: rows,
@@ -171,8 +172,7 @@ const TodayInvoicesGrid = () => {
         fontSize: 9,
         cellPadding: 2,
         overflow: "linebreak",
-        cellWidth: "wrap",
-        halign: "center", // Center align all cells
+        halign: "center",
       },
       headStyles: {
         fillColor: [220, 38, 38],
@@ -181,24 +181,16 @@ const TodayInvoicesGrid = () => {
         halign: "center",
       },
       columnStyles: {
-        0: {
-          // Item column
-          cellWidth: itemColumnWidth,
-          fontStyle: "bold",
-          halign: "left",
-        },
+        0: { cellWidth: itemColumnWidth, fontStyle: "bold", halign: "left" }, // Item column
         ...Object.fromEntries(
-          Array.from({ length: headers.length - 1 }, (_, i) => [
+          Array.from({ length: data.length }, (_, i) => [
             i + 1,
-            {
-              cellWidth: restaurantColumnWidth,
-              halign: "center",
-            },
+            { cellWidth: restaurantColumnWidth, halign: "center" },
           ])
         ),
+        [data.length + 1]: { cellWidth: totalColumnWidth, fontStyle: "bold", halign: "center" }, // Total column
       },
       didDrawPage: function (data) {
-        // Add page number
         doc.setFontSize(10);
         doc.text(
           `Page ${data.pageNumber}`,
@@ -208,17 +200,11 @@ const TodayInvoicesGrid = () => {
       },
       margin: { top: 25, right: 15, bottom: 15, left: 15 },
       theme: "grid",
-      tableWidth: "auto",
-      didDrawCell: function (data) {
-        // Add extra styling for header cells if needed
-        if (data.row.index === 0) {
-          doc.setTextColor(255, 255, 255);
-        }
-      },
     });
-
+  
     doc.save("todays_invoices.pdf");
   };
+  
 
   const downloadSnapshot = async () => {
     const tableElement = document.getElementById("invoice-table");
@@ -326,7 +312,8 @@ const TodayInvoicesGrid = () => {
                     color: "white",
                     padding: "16px",
                     border: "1px solid #ddd",
-                    minWidth: "200px", // Increased minimum width for item column
+                    minWidth: { xs: "60px", sm: "150px", md: "200px" }, // Responsive width
+    maxWidth: { xs: "80px", sm: "180px", md: "250px" },
                     whiteSpace: "normal", // Allow text wrapping
                     wordWrap: "break-word",
                   }}
@@ -356,7 +343,7 @@ const TodayInvoicesGrid = () => {
                     color: "white",
                     padding: "16px",
                     border: "1px solid #ddd",
-                    minWidth: "100px",
+                    minWidth: "70px",
                     position: "sticky",
                     right: 0,
                     zIndex: 2,
@@ -386,7 +373,7 @@ const TodayInvoicesGrid = () => {
                         border: "1px solid #ddd",
                         fontWeight: "500",
                         zIndex: 1,
-                        minWidth: "200px",
+                        minWidth: "20px",
                         whiteSpace: "normal",
                         wordWrap: "break-word",
                       }}
