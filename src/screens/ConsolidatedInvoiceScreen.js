@@ -137,12 +137,12 @@ const ConsolidatedInvoiceView = () => {
       const year = date.getFullYear();
       const month = date.getMonth();
       const day = date.getDate();
-      const period = day <= 14 ? "first" : "second";
+      const period = day <= 15 ? "first" : "second";
 
       const key = `${year}-${month}-${period}`;
       if (!grouped[key]) {
         grouped[key] = {
-          period: period === "first" ? "1-14" : "15-end",
+          period: period === "first" ? "1-15" : "16-end",
           month: date.toLocaleString("default", { month: "long" }),
           year,
           invoices: [],
@@ -151,10 +151,10 @@ const ConsolidatedInvoiceView = () => {
           startDate:
             period === "first"
               ? new Date(year, month, 1)
-              : new Date(year, month, 15),
+              : new Date(year, month, 16),
           endDate:
             period === "first"
-              ? new Date(year, month, 14)
+              ? new Date(year, month, 15)
               : new Date(year, month + 1, 0),
           isPaid: true, // Initialize as true for payment status
         };
@@ -677,7 +677,7 @@ const ConsolidatedInvoiceView = () => {
                       <TableCell
                         style={{ fontSize: "0.875rem", color: "#4A5568" }}
                       >
-                        {group.period === "1-14" ? "1st - 14th" : "15th - End"}
+                        {group.period === "1-15" ? "1st - 15th" : "16th - End"}
                       </TableCell>
 
                       {/* Total Invoices */}

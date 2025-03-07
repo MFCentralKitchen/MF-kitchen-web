@@ -17,6 +17,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Switch,
 } from "@mui/material";
 import {
   BarChart,
@@ -45,6 +46,8 @@ import { collection, query, onSnapshot, getDocs } from "firebase/firestore";
 import { db } from "../firebase-config";
 import fetchRestaurantPerformance from "./fetchRestaurantPerformance";
 import TodayInvoicesGrid from "../components/TodayInvoicesGrid";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { DateTime } from "luxon";
 
 const Dashboard = () => {
   const [orderStatusData, setOrderStatusData] = useState([]);
@@ -58,10 +61,65 @@ const Dashboard = () => {
   const [totalCombined, setTotalCombined] = useState({});
   const [todayRestaurantOrders, setTodayRestaurantOrders] = useState([]);
   const [restaurantUnpaidRevenue, setRestaurantUnpaidRevenue] = useState([]);
+  const [isCutoffEnabled, setIsCutoffEnabled] = useState(false);
 
   const getChartHeight = () => {
     return window.innerWidth <= 768 ? 200 : 300;
   };
+
+  const checkAndUpdateCutoffStatus = async () => {
+    const londonTime = DateTime.now().setZone("Europe/London");
+    const hour = londonTime.hour;
+
+    let shouldBeEnabled = !(hour >= 18 || hour < 6); // Disable between 6PM-6AM
+
+    try {
+      const docRef = doc(db, "cutoffTime", "O5uOFJFkCskUD6roE237");
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        const dbValue = docSnap.data().isCutoffEnabled;
+
+        // If the DB value differs from the calculated value, update Firestore
+        if (dbValue !== shouldBeEnabled) {
+          await updateDoc(docRef, { isCutoffEnabled: shouldBeEnabled });
+        }
+
+        setIsCutoffEnabled(shouldBeEnabled);
+      } else {
+        console.log("No such document!");
+      }
+    } catch (error) {
+      console.error("Error fetching cutoff status:", error);
+    }
+  };
+
+  useEffect(() => {
+    // checkAndUpdateCutoffStatus();
+
+    // Set an interval to check every minute
+    // const interval = setInterval(checkAndUpdateCutoffStatus, 60000);
+
+    // return () => clearInterval(interval);
+  }, []);
+
+
+   // Handle Manual Toggle Change
+   const handleToggleChange = async () => {
+    const newValue = !isCutoffEnabled;
+    setIsCutoffEnabled(newValue);
+
+    try {
+      const docRef = doc(db, "cutoffTime", "O5uOFJFkCskUD6roE237");
+      await updateDoc(docRef, {
+        isCutoffEnabled: newValue
+      });
+      console.log("Cutoff status updated successfully!");
+    } catch (error) {
+      console.error("Error updating cutoff status:", error);
+    }
+  };
+  
 
   const [chartHeight, setChartHeight] = useState(getChartHeight());
 
@@ -437,6 +495,11 @@ const Dashboard = () => {
 
   return (
     <Box sx={{ minHeight: "100vh", padding: 4, backgroundColor: "#f9f9f9" }}>
+      <Paper sx={{ padding: 2, display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 2 }}>
+        <Typography variant="h6">Allow Mobile Orders</Typography>
+        <Switch checked={isCutoffEnabled} onChange={handleToggleChange} />
+      </Paper>
+
       {/* Top Row - KPI Cards */}
       <Grid container spacing={4} sx={{ marginBottom: 4 }}>
         {[
