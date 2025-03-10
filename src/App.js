@@ -13,6 +13,8 @@ import ConsolidatedInvoiceScreen from "./screens/ConsolidatedInvoiceScreen";
 import "@fontsource/roboto";
 import { createTheme, ThemeProvider, useMediaQuery } from "@mui/material";
 import CssBaseline from "@mui/material/CssBaseline";
+import { LocalizationProvider } from "@mui/x-date-pickers";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 
 const theme = createTheme({
   typography: {
@@ -26,6 +28,7 @@ const App = () => {
 
   return (
     <ThemeProvider theme={theme}>
+       <LocalizationProvider dateAdapter={AdapterDayjs}>
       <CssBaseline />
       <Router>
         <Routes>
@@ -57,6 +60,7 @@ const App = () => {
           )}
         </Routes>
       </Router>
+      </LocalizationProvider>
     </ThemeProvider>
   );
 };

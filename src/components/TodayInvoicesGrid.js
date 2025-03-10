@@ -20,6 +20,7 @@ import {
 } from "@mui/material";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import WarningIcon from "@mui/icons-material/Warning";
+import * as XLSX from "xlsx";
 
 const theme = createTheme({
   palette: {
@@ -163,107 +164,105 @@ const TodayInvoicesGrid = () => {
       setLoading(false);
     }
   };
+
+  const downloadExcel = () => {
+    const workbook = XLSX.utils.book_new();
+    const worksheetData = [];
   
+    // Header row
+    const headers = ["Item", ...data.map((d) => d.restaurantName), "Total"];
+    worksheetData.push(headers);
+  
+    // Iterate over categories and items
+    Object.entries(items).forEach(([category, categoryItems]) => {
+      // Add category row (spanning columns)
+      worksheetData.push([category, ...Array(data.length + 1).fill("")]); // Empty columns after category
+  
+      // Add items within category
+      categoryItems.forEach((item) => {
+        const row = [item.title];
+        let rowTotal = 0;
+  
+        data.forEach((restaurant) => {
+          const quantity =
+            restaurant.itemQuantities.find((q) => q.title === item.title)?.quantity || 0;
+          row.push(quantity);
+          rowTotal += quantity;
+        });
+  
+        row.push(rowTotal); // Add total column value
+        worksheetData.push(row);
+      });
+    });
+  
+    // Grand Total Row
+    const totalRow = ["Total"];
+    let grandTotal = 0;
+  
+    data.forEach((restaurant) => {
+      const restaurantTotal = restaurant.itemQuantities.reduce(
+        (sum, item) => sum + item.quantity,
+        0
+      );
+      totalRow.push(restaurantTotal);
+      grandTotal += restaurantTotal;
+    });
+  
+    totalRow.push(grandTotal);
+    worksheetData.push(totalRow);
+  
+    // Convert to worksheet and save
+    const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Invoices");
+    XLSX.writeFile(workbook, "todays_invoices.xlsx");
+  };
+  
+
 
   const downloadPDF = () => {
     const doc = new jsPDF({
       orientation: "landscape",
       unit: "mm",
-      format: "a3", // Ensure enough space for all columns
+      format: "a3",
     });
-
-    // Add the "Total" column in the header
+  
     const headers = ["Item", ...data.map((d) => d.restaurantName), "Total"];
     const rows = [];
-
-    items.forEach((item) => {
-      const row = [item.title];
-
-      let rowTotal = 0; // Track total for this item
-
-      data.forEach((restaurant) => {
-        const quantity =
-          restaurant.itemQuantities.find((q) => q.title === item.title)
-            ?.quantity || 0;
-        row.push(quantity);
-        rowTotal += quantity; // Add to total
+  
+    // Fix: Loop over Object.values(items) instead of items
+    Object.values(items).forEach((categoryItems) => {
+      categoryItems.forEach((item) => {
+        const row = [item.title];
+        let rowTotal = 0;
+  
+        data.forEach((restaurant) => {
+          const quantity =
+            restaurant.itemQuantities.find((q) => q.title === item.title)
+              ?.quantity || 0;
+          row.push(quantity);
+          rowTotal += quantity;
+        });
+  
+        row.push(rowTotal);
+        rows.push(row);
       });
-
-      row.push(rowTotal); // Add total column value
-      rows.push(row);
     });
-
-    // Column width calculations
-    const maxRestaurantNameLength = Math.max(
-      ...data.map((d) => d.restaurantName.length)
-    );
-    const maxItemNameLength = Math.max(
-      ...items.map((item) => item.title.length)
-    );
-
-    const itemColumnWidth = Math.min(Math.max(maxItemNameLength * 2, 25), 60);
-    const restaurantColumnWidth = Math.min(
-      Math.max(maxRestaurantNameLength * 1.4, 14),
-      26
-    );
-    const totalColumnWidth = 30; // Fixed width for the total column
-
-    // Set title
+  
     doc.setFontSize(20);
     doc.text("Today's Invoice Grid", doc.internal.pageSize.getWidth() / 2, 15, {
       align: "center",
     });
-
-    // Add timestamp
-    doc.setFontSize(10);
-    const timestamp = new Date().toLocaleString();
-    doc.text(`Generated: ${timestamp}`, 10, 10);
-
-    // Generate the table
+  
     doc.autoTable({
       head: [headers],
       body: rows,
       startY: 25,
-      styles: {
-        fontSize: 9,
-        cellPadding: 2,
-        overflow: "linebreak",
-        halign: "center",
-      },
-      headStyles: {
-        fillColor: [220, 38, 38],
-        textColor: 255,
-        fontStyle: "bold",
-        halign: "center",
-      },
-      columnStyles: {
-        0: { cellWidth: itemColumnWidth, fontStyle: "bold", halign: "left" }, // Item column
-        ...Object.fromEntries(
-          Array.from({ length: data.length }, (_, i) => [
-            i + 1,
-            { cellWidth: restaurantColumnWidth, halign: "center" },
-          ])
-        ),
-        [data.length + 1]: {
-          cellWidth: totalColumnWidth,
-          fontStyle: "bold",
-          halign: "center",
-        }, // Total column
-      },
-      didDrawPage: function (data) {
-        doc.setFontSize(10);
-        doc.text(
-          `Page ${data.pageNumber}`,
-          doc.internal.pageSize.getWidth() - 20,
-          doc.internal.pageSize.getHeight() - 10
-        );
-      },
-      margin: { top: 25, right: 15, bottom: 15, left: 15 },
       theme: "grid",
     });
-
+  
     doc.save("todays_invoices.pdf");
   };
+  
 
   const downloadSnapshot = async () => {
     const tableElement = document.getElementById("invoice-table");
@@ -541,14 +540,23 @@ console.log(JSON.stringify(items),"ITEMSSSS")
           >
             Download PDF
           </Button>
-          <Button
+          {/* <Button
             variant="contained"
             color="secondary"
             onClick={downloadSnapshot}
             sx={{ minWidth: 150 }}
           >
             Download Snapshot
-          </Button>
+          </Button> */}
+          <Button
+  variant="contained"
+  color="secondary"
+  onClick={downloadExcel}
+  sx={{ minWidth: 150 }}
+>
+  Download Excel
+</Button>
+
         </Box>
       </Paper>
     </ThemeProvider>

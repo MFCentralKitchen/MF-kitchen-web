@@ -361,7 +361,7 @@ console.log(invoice,"oppo1wpoqwpoqwpoqw")
                     </TableCell>
 
                     {/* Item Total Price */}
-                    <TableCell>£{item.price * item.quantity}</TableCell>
+                    <TableCell>£{(item.price * item.quantity).toFixed(2)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

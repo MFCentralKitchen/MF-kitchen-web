@@ -48,6 +48,7 @@ import fetchRestaurantPerformance from "./fetchRestaurantPerformance";
 import TodayInvoicesGrid from "../components/TodayInvoicesGrid";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { DateTime } from "luxon";
+import SalesCards from "../components/SalesCards";
 
 const Dashboard = () => {
   const [orderStatusData, setOrderStatusData] = useState([]);
@@ -71,7 +72,7 @@ const Dashboard = () => {
     const londonTime = DateTime.now().setZone("Europe/London");
     const hour = londonTime.hour;
 
-    let shouldBeEnabled = !(hour >= 18 || hour < 6); // Disable between 6PM-6AM
+    // let shouldBeEnabled = !(hour >= 18 || hour < 6); // Disable between 6PM-6AM
 
     try {
       const docRef = doc(db, "cutoffTime", "O5uOFJFkCskUD6roE237");
@@ -81,11 +82,11 @@ const Dashboard = () => {
         const dbValue = docSnap.data().isCutoffEnabled;
 
         // If the DB value differs from the calculated value, update Firestore
-        if (dbValue !== shouldBeEnabled) {
-          await updateDoc(docRef, { isCutoffEnabled: shouldBeEnabled });
-        }
+        // if (dbValue !== shouldBeEnabled) {
+        //   await updateDoc(docRef, { isCutoffEnabled: shouldBeEnabled });
+        // }
 
-        setIsCutoffEnabled(shouldBeEnabled);
+        setIsCutoffEnabled(dbValue);
       } else {
         console.log("No such document!");
       }
@@ -95,7 +96,7 @@ const Dashboard = () => {
   };
 
   useEffect(() => {
-    // checkAndUpdateCutoffStatus();
+    checkAndUpdateCutoffStatus();
 
     // Set an interval to check every minute
     // const interval = setInterval(checkAndUpdateCutoffStatus, 60000);
@@ -553,6 +554,8 @@ const Dashboard = () => {
           </Grid>
         ))}
       </Grid>
+
+      <SalesCards />
 
       {/* Charts Grid */}
       <Grid container spacing={4}>
