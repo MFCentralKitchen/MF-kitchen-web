@@ -14,6 +14,7 @@ const AddCategoryModal = ({ open, onClose }) => {
   const [categories, setCategories] = useState([]);
   const [isEditing, setIsEditing] = useState(false);
   const [editingCategoryId, setEditingCategoryId] = useState(null);
+  const [updateClicked, setUpdateClicked] = useState(false);
   
   const fetchCategories = async () => {
     const categoryQuery = query(collection(db, Collections.INVENTORY_CATEGORY));
@@ -45,35 +46,43 @@ const AddCategoryModal = ({ open, onClose }) => {
       return;
     }
 
+    if (!isEditing && !image) {
+      setError('Please select an image for the category');
+      return;
+    }
+
     setLoading(true);
     try {
       if (isEditing) {
-        const oldCategory = categories.find(cat => cat.id === editingCategoryId);
+        // EDIT EXISTING CATEGORY
+        const categoryToUpdate = categories.find(cat => cat.id === editingCategoryId);
+        
+        if (!categoryToUpdate) {
+          throw new Error('Category to update not found in local state');
+        }
+
         const categoryData = {
-          id: editingCategoryId,
-          category,
-          createdAt: new Date().toISOString(),
+          ...categoryToUpdate, // Keep all existing properties
+          category, // Update the name
+          updatedAt: new Date().toISOString() // Add update timestamp
         };
 
         if (image) {
-          // Delete the old image if a new one is uploaded
-          const oldImageRef = ref(storage, `categories/${oldCategory.id}.jpg`);
-          await deleteObject(oldImageRef);
+          // Delete old image if it exists
+          if (categoryToUpdate.image) {
+            const oldImageRef = ref(storage, `categories/${editingCategoryId}.jpg`);
+            await deleteObject(oldImageRef).catch(console.error);
+          }
           
-          // Upload the new image
+          // Upload new image
           const newImageRef = ref(storage, `categories/${editingCategoryId}.jpg`);
           await uploadBytes(newImageRef, image);
-          const downloadURL = await getDownloadURL(newImageRef);
-          categoryData.image = downloadURL; // Update the category data with the new image URL
-        } else {
-          // Keep the old image if no new image is uploaded
-          categoryData.image = oldCategory.image;
+          categoryData.image = await getDownloadURL(newImageRef);
         }
 
         await setDoc(doc(db, Collections.INVENTORY_CATEGORY, editingCategoryId), categoryData);
-        setEditingCategoryId(null);
       } else {
-        // Add new category logic
+        // ADD NEW CATEGORY
         const newDocRef = doc(collection(db, Collections.INVENTORY_CATEGORY));
         const imageRef = ref(storage, `categories/${newDocRef.id}.jpg`);
         await uploadBytes(imageRef, image);
@@ -84,6 +93,7 @@ const AddCategoryModal = ({ open, onClose }) => {
           category,
           image: downloadURL,
           createdAt: new Date().toISOString(),
+          updatedAt: null
         };
 
         await setDoc(newDocRef, categoryData);
@@ -94,11 +104,13 @@ const AddCategoryModal = ({ open, onClose }) => {
       setImage(null);
       setImagePreview(null);
       setError('');
-      onClose(); // Close modal on success
-      fetchCategories(); // Refresh categories
+      onClose();
+      fetchCategories();
     } catch (err) {
       console.error("Error adding/updating category: ", err);
-      setError('Failed to add/update category');
+      setError(err.message.includes('not found') 
+        ? 'Category not found - please refresh and try again' 
+        : 'Failed to add/update category');
     } finally {
       setLoading(false);
     }
@@ -106,9 +118,10 @@ const AddCategoryModal = ({ open, onClose }) => {
 
   const handleEditClick = (category) => {
     setCategory(category.category);
-    setImagePreview(category.image); // Show the current image in the preview
+    setImagePreview(category.image);
     setEditingCategoryId(category.id);
     setIsEditing(true);
+    setUpdateClicked(true);
   };
 
   const handleCancelEdit = () => {
@@ -117,6 +130,7 @@ const AddCategoryModal = ({ open, onClose }) => {
     setImage(null);
     setImagePreview(null);
     setEditingCategoryId(null);
+    setUpdateClicked(false);
   };
 
   const renderCategoryList = () => (
@@ -133,8 +147,8 @@ const AddCategoryModal = ({ open, onClose }) => {
   return (
     <Modal open={open} onClose={onClose}>
       <Box sx={modalStyle}>
-        <h2>{!isEditing ? 'Edit Category' : 'Add Category'}</h2>
-        {isEditing ? (
+        <h2>{isEditing ? 'Edit Category' : 'Add Category'}</h2>
+        {(!isEditing || updateClicked) ? (
           <form onSubmit={handleSubmit}>
             <TextField
               label="Category Name"
@@ -154,7 +168,19 @@ const AddCategoryModal = ({ open, onClose }) => {
               <Button type="submit" variant="contained" color="primary" disabled={loading}>
                 {loading ? <CircularProgress size={24} /> : 'Save Changes'}
               </Button>
-              <Button onClick={onClose} variant="outlined" color="secondary" style={{ marginLeft: '10px' }}>
+              <Button 
+                onClick={() => {
+                  onClose();
+                  setCategory('');
+                  setImage(null);
+                  setImagePreview(null);
+                  setEditingCategoryId(null);
+                  setUpdateClicked(false);
+                }} 
+                variant="outlined" 
+                color="secondary" 
+                style={{ marginLeft: '10px' }}
+              >
                 Cancel
               </Button>
             </div>
@@ -162,11 +188,24 @@ const AddCategoryModal = ({ open, onClose }) => {
         ) : (
           <div>
             {renderCategoryList()}
-            <Button onClick={handleCancelEdit} variant="outlined" color="secondary" style={{ marginTop: '20px' }}>Cancel Edit</Button>
+            <Button onClick={handleCancelEdit} variant="outlined" color="secondary" style={{ marginTop: '20px' }}>
+              Cancel Edit
+            </Button>
           </div>
         )}
-        <Button onClick={() => setIsEditing(!isEditing)} variant="outlined" style={{ position: 'absolute', top: 16, right: 16 }}>
-          {!isEditing ? 'Add Category' : 'Edit Categories'}
+        <Button 
+          onClick={() => {
+            if (updateClicked) {
+              setIsEditing(true);
+            } else {
+              setIsEditing(!isEditing);
+            }
+            setUpdateClicked(false);
+          }} 
+          variant="outlined" 
+          style={{ position: 'absolute', top: 16, right: 16 }}
+        >
+          {isEditing ? 'Add Category' : 'Edit Categories'}
         </Button>
       </Box>
     </Modal>

@@ -26,6 +26,7 @@ import { db } from "../firebase-config";
 import Collections from "../collections";
 import LOGO from "../assets/MF-CPU-LOGO.png";
 import Header from "../components/header";
+// import { saveAs } from "file-saver";
 
 const AddUsers = () => {
   const [formData, setFormData] = useState({
@@ -48,6 +49,25 @@ const AddUsers = () => {
     severity: "",
   });
 
+  // const downloadInventoryAsJSON = async () => {
+  //   try {
+  //     const snapshot = await getDocs(collection(db, "inventoryItems"));
+  //     const items = snapshot.docs.map((doc) => ({
+  //       id: doc.id,
+  //       ...doc.data(),
+  //     }));
+
+  //     const blob = new Blob([JSON.stringify(items, null, 2)], {
+  //       type: "application/json",
+  //     });
+
+  //     saveAs(blob, "inventoryItems.json");
+  //   } catch (error) {
+  //     console.error("Failed to download inventory:", error);
+  //     alert("Failed to download inventory");
+  //   }
+  // };
+
   const handleChange = (e) => {
     setFormData({
       ...formData,
@@ -57,7 +77,8 @@ const AddUsers = () => {
 
   // Regular expression to validate UK phone number
   const isValidUKPhone = (phone) => {
-    const ukPhoneRegex = /^(\+44\s?7\d{3}|\(?07\d{3}\)?|\d{5}|\d{4})\s?\d{3,4}\s?\d{3,4}$/;
+    const ukPhoneRegex =
+      /^(\+44\s?7\d{3}|\(?07\d{3}\)?|\d{5}|\d{4})\s?\d{3,4}\s?\d{3,4}$/;
     return ukPhoneRegex.test(phone);
   };
   const isMobile = useMediaQuery("(max-width:600px)");
@@ -167,8 +188,26 @@ const AddUsers = () => {
 
   return (
     <Box sx={{ color: "#C70A0A" }}>
-      <Header title='Add User'/>
-      <div style={{ maxWidth: "100%", margin: "0 auto", padding:!isMobile? "150px":'20px',height:isMobile ?'700px':'320Px' }}>
+      <Header title="Add User" />
+      {/* <div style={{ textAlign: "center", marginTop: "20px" }}>
+        <Button
+          variant="outlined"
+          color="primary"
+          onClick={downloadInventoryAsJSON}
+          sx={{ marginTop: "10px" }}
+        >
+          Download Inventory JSON
+        </Button>
+      </div> */}
+
+      <div
+        style={{
+          maxWidth: "100%",
+          margin: "0 auto",
+          padding: !isMobile ? "150px" : "20px",
+          height: isMobile ? "700px" : "320Px",
+        }}
+      >
         <form onSubmit={handleSubmit}>
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
@@ -293,7 +332,7 @@ const AddUsers = () => {
               color="#C70A0A"
               type="submit"
               style={{ width: "150px" }}
-              sx={{ backgroundColor: "#FFB500" ,color:'white'}}
+              sx={{ backgroundColor: "#FFB500", color: "white" }}
               disabled={loading} // Disable button during loading
             >
               {loading ? <CircularProgress size={24} /> : "Add User"}

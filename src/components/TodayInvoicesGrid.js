@@ -1,11 +1,13 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   getFirestore,
   collection,
-  getDocs,
   query,
   where,
+  onSnapshot,
+  getDocs
 } from "firebase/firestore";
+import { DateTime } from "luxon";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import html2canvas from "html2canvas";
@@ -17,9 +19,12 @@ import {
   Alert,
   AlertTitle,
   CircularProgress,
+  IconButton,
+  Tooltip
 } from "@mui/material";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import WarningIcon from "@mui/icons-material/Warning";
+import RefreshIcon from "@mui/icons-material/Refresh";
 import * as XLSX from "xlsx";
 
 const theme = createTheme({
@@ -35,251 +40,322 @@ const theme = createTheme({
 
 const TodayInvoicesGrid = () => {
   const [data, setData] = useState([]);
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState({});
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
 
-  const fetchData = async () => {
+  // Get UK timezone date range
+  const getUKDateRange = () => {
+    const now = DateTime.now().setZone("Europe/London");
+    const startOfDay = now.startOf("day");
+    const endOfDay = now.endOf("day");
+    
+    return {
+      start: startOfDay.toISO(),
+      end: endOfDay.toISO()
+    };
+  };
+
+  // Process fetched data
+  const processData = useCallback(async (invoices, db) => {
     try {
-      setLoading(true);
-      const db = getFirestore();
-      const today = new Date();
-      const startOfDay = new Date(today.setHours(0, 0, 0, 0)).toISOString();
-      const endOfDay = new Date(today.setHours(23, 59, 59, 999)).toISOString();
-  
-      // Fetch today's invoices
-      const invoicesQuery = query(
-        collection(db, "invoices"),
-        where("createdAt", ">=", startOfDay),
-        where("createdAt", "<=", endOfDay)
-      );
-      const invoicesSnapshot = await getDocs(invoicesQuery);
-      const invoices = invoicesSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-  
-      // Fetch inventory, users, inventory items, and categories
-      const [inventorySnapshot, usersSnapshot, inventoryItemsSnapshot, categoriesSnapshot] = await Promise.all([
-        getDocs(collection(db, "inventory")),
-        getDocs(collection(db, "users")),
+      // Fetch all necessary collections in parallel
+      const [
+        inventoryItemsSnapshot,
+        categoriesSnapshot,
+        usersSnapshot
+      ] = await Promise.all([
         getDocs(collection(db, "inventoryItems")),
         getDocs(collection(db, "inventoryCategory")),
+        getDocs(collection(db, "users"))
       ]);
-  
-      // Process inventory items
-      const inventoryItems = inventoryItemsSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-  
-      // Process categories into a map { categoryId: categoryName }
-      const categories = categoriesSnapshot.docs.map((doc) => ({
-        id : doc.id,
-        ...doc.data(),
-      }));
-  
-      // Group items by category
-      const categorizedItems = {};
-  
-      invoices.forEach((invoice) => {
-        invoice.items.forEach((item) => {
-          // Find corresponding inventory item
-          const inventoryItem = inventoryItems.find(
-            (invItem) => invItem.title === item.title
-          );
-          console.log(inventoryItem.categoryId,"TESTSTSTSST",JSON.stringify(categories),categories)
-          if (!inventoryItem) return; // Skip if no matching inventory item
 
-          const categoryItem = categories.find(
-            (invItem) => invItem.id === inventoryItem.categoryId
+      // Process data into maps for quick lookup
+      const inventoryItems = inventoryItemsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      const categories = categoriesSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      const users = usersSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      // Process categorized items
+      const categorizedItems = {};
+      const uniqueItems = new Set();
+
+      invoices.forEach(invoice => {
+        invoice.items.forEach(item => {
+          uniqueItems.add(item.title);
+          
+          const inventoryItem = inventoryItems.find(
+            invItem => invItem.title === item.title
           );
-  
-          const categoryName = categoryItem.category || "Uncategorized";
-  
+          if (!inventoryItem) return;
+
+          const category = categories.find(
+            cat => cat.id === inventoryItem.categoryId
+          );
+          const categoryName = category?.category || "Uncategorized";
+
           if (!categorizedItems[categoryName]) {
             categorizedItems[categoryName] = [];
           }
-  
-          // Avoid duplicate items within the same category
-          if (!categorizedItems[categoryName].some((i) => i.title === item.title)) {
+
+          if (!categorizedItems[categoryName].some(i => i.title === item.title)) {
             categorizedItems[categoryName].push(item);
           }
         });
       });
-  
-      // Ensure empty categories are still accounted for
-      categories.forEach((category) => {
-        const categoryName = category.category || "Uncategorized"; // Ensure category name is a string
-        if (!categorizedItems[categoryName] || categorizedItems[categoryName].length === 0) {
-          delete categorizedItems[categoryName]; // Remove empty categories
-        }
-      });
-      
-  
-      // Update state ONCE with categorized items
-      setItems(categorizedItems);
-  
-      // If no invoices, return early
-      if (invoices.length === 0) {
-        setData([]);
-        setLoading(false);
-        return;
-      }
-  
-      // Process restaurant-wise order data
-      const users = usersSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-  
-      // Collect all unique items across invoices
-      const uniqueItems = new Set();
-      invoices.forEach((invoice) =>
-        invoice.items.forEach((item) => uniqueItems.add(item.title))
-      );
-  
-      const itemList = Array.from(uniqueItems).map((title) => ({ title }));
-  
-      // Generate restaurant-wise item quantities
-      const restaurantGrid = users.map((user) => {
+
+      // Process restaurant-wise data
+      const itemList = Array.from(uniqueItems).map(title => ({ title }));
+      const restaurantGrid = users.map(user => {
         const orders = invoices.filter(
-          (invoice) => invoice.restaurantName === user.restaurantName
+          invoice => invoice.restaurantName === user.restaurantName
         );
-  
-        const itemQuantities = itemList.map((item) => {
+
+        const itemQuantities = itemList.map(item => {
           const quantity = orders
-            .flatMap((order) => order.items)
-            .filter((orderItem) => orderItem.title === item.title)
+            .flatMap(order => order.items)
+            .filter(orderItem => orderItem.title === item.title)
             .reduce((sum, orderItem) => sum + (orderItem.quantity || 0), 0);
           return { title: item.title, quantity };
         });
-  
+
         return { restaurantName: user.restaurantName, itemQuantities };
       });
-  
-      setData(restaurantGrid);
-    } catch (error) {
-      console.error("Error fetching data: ", error);
+
+      return { categorizedItems, restaurantGrid };
+    } catch (err) {
+      console.error("Error processing data:", err);
+      throw err;
+    }
+  }, []);
+
+  // Fetch data with real-time updates
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const db = getFirestore();
+      const { start, end } = getUKDateRange();
+
+      // Query for today's invoices in UK time
+      const invoicesQuery = query(
+        collection(db, "invoices"),
+        where("createdAt", ">=", start),
+        where("createdAt", "<=", end)
+      );
+
+      // Set up real-time listener
+      const unsubscribe = onSnapshot(invoicesQuery, async (snapshot) => {
+        const invoices = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+
+        if (invoices.length === 0) {
+          setData([]);
+          setItems({});
+          setLoading(false);
+          setLastUpdated(new Date());
+          return;
+        }
+
+        try {
+          const { categorizedItems, restaurantGrid } = await processData(invoices, db);
+          setItems(categorizedItems);
+          setData(restaurantGrid);
+          setLastUpdated(new Date());
+        } catch (err) {
+          setError("Failed to process data. Please try again.");
+          console.error("Processing error:", err);
+        } finally {
+          setLoading(false);
+        }
+      });
+
+      return () => unsubscribe();
+    } catch (err) {
+      setError("Failed to fetch data. Please try again.");
+      console.error("Fetch error:", err);
+      setLoading(false);
+    }
+  }, [processData]);
+
+  // Manual refresh
+  const handleRefresh = async () => {
+    try {
+      setLoading(true);
+      await fetchData();
+    } catch (err) {
+      setError("Refresh failed. Please try again.");
+      console.error("Refresh error:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  const downloadExcel = () => {
-    const workbook = XLSX.utils.book_new();
-    const worksheetData = [];
-  
-    // Header row
-    const headers = ["Item", ...data.map((d) => d.restaurantName), "Total"];
-    worksheetData.push(headers);
-  
-    // Iterate over categories and items
-    Object.entries(items).forEach(([category, categoryItems]) => {
-      // Add category row (spanning columns)
-      worksheetData.push([category, ...Array(data.length + 1).fill("")]); // Empty columns after category
-  
-      // Add items within category
-      categoryItems.forEach((item) => {
-        const row = [item.title];
-        let rowTotal = 0;
-  
-        data.forEach((restaurant) => {
-          const quantity =
-            restaurant.itemQuantities.find((q) => q.title === item.title)?.quantity || 0;
-          row.push(quantity);
-          rowTotal += quantity;
-        });
-  
-        row.push(rowTotal); // Add total column value
-        worksheetData.push(row);
+  // Initialize data fetching
+  useEffect(() => {
+    const unsubscribePromise = fetchData();
+    
+    return () => {
+      unsubscribePromise.then(unsubscribe => {
+        if (unsubscribe && typeof unsubscribe === 'function') {
+          unsubscribe();
+        }
       });
-    });
-  
-    // Grand Total Row
-    const totalRow = ["Total"];
-    let grandTotal = 0;
-  
-    data.forEach((restaurant) => {
-      const restaurantTotal = restaurant.itemQuantities.reduce(
-        (sum, item) => sum + item.quantity,
-        0
-      );
-      totalRow.push(restaurantTotal);
-      grandTotal += restaurantTotal;
-    });
-  
-    totalRow.push(grandTotal);
-    worksheetData.push(totalRow);
-  
-    // Convert to worksheet and save
-    const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Invoices");
-    XLSX.writeFile(workbook, "todays_invoices.xlsx");
-  };
-  
+    };
+  }, [fetchData]);
 
+  const downloadExcel = () => {
+    try {
+      const workbook = XLSX.utils.book_new();
+      const worksheetData = [];
+
+      // Header row
+      const headers = ["Item", ...data.map(d => d.restaurantName), "Total"];
+      worksheetData.push(headers);
+
+      // Add categories and items
+      Object.entries(items).forEach(([category, categoryItems]) => {
+        worksheetData.push([category, ...Array(data.length + 1).fill("")]);
+
+        categoryItems.forEach(item => {
+          const row = [item.title];
+          let rowTotal = 0;
+
+          data.forEach(restaurant => {
+            const quantity = restaurant.itemQuantities.find(
+              q => q.title === item.title
+            )?.quantity || 0;
+            row.push(quantity);
+            rowTotal += quantity;
+          });
+
+          row.push(rowTotal);
+          worksheetData.push(row);
+        });
+      });
+
+      // Grand Total Row
+      const totalRow = ["Total"];
+      let grandTotal = 0;
+
+      data.forEach(restaurant => {
+        const restaurantTotal = restaurant.itemQuantities.reduce(
+          (sum, item) => sum + item.quantity,
+          0
+        );
+        totalRow.push(restaurantTotal);
+        grandTotal += restaurantTotal;
+      });
+
+      totalRow.push(grandTotal);
+      worksheetData.push(totalRow);
+
+      // Convert to worksheet and save
+      const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Invoices");
+      XLSX.writeFile(workbook, `todays_invoices_${new Date().toISOString()}.xlsx`);
+    } catch (err) {
+      setError("Failed to generate Excel file");
+      console.error("Excel generation error:", err);
+    }
+  };
 
   const downloadPDF = () => {
-    const doc = new jsPDF({
-      orientation: "landscape",
-      unit: "mm",
-      format: "a3",
-    });
-  
-    const headers = ["Item", ...data.map((d) => d.restaurantName), "Total"];
-    const rows = [];
-  
-    // Fix: Loop over Object.values(items) instead of items
-    Object.values(items).forEach((categoryItems) => {
-      categoryItems.forEach((item) => {
-        const row = [item.title];
-        let rowTotal = 0;
-  
-        data.forEach((restaurant) => {
-          const quantity =
-            restaurant.itemQuantities.find((q) => q.title === item.title)
-              ?.quantity || 0;
-          row.push(quantity);
-          rowTotal += quantity;
-        });
-  
-        row.push(rowTotal);
-        rows.push(row);
+    try {
+      const doc = new jsPDF({
+        orientation: "landscape",
+        unit: "mm",
+        format: "a3",
       });
-    });
-  
-    doc.setFontSize(20);
-    doc.text("Today's Invoice Grid", doc.internal.pageSize.getWidth() / 2, 15, {
-      align: "center",
-    });
-  
-    doc.autoTable({
-      head: [headers],
-      body: rows,
-      startY: 25,
-      theme: "grid",
-    });
-  
-    doc.save("todays_invoices.pdf");
+
+      const headers = ["Item", ...data.map(d => d.restaurantName), "Total"];
+      const rows = [];
+
+      Object.entries(items).forEach(([category, categoryItems]) => {
+        // Add category header
+        rows.push([category, ...Array(headers.length - 1).fill("")]);
+        
+        // Add items
+        categoryItems.forEach(item => {
+          const row = [item.title];
+          let rowTotal = 0;
+
+          data.forEach(restaurant => {
+            const quantity = restaurant.itemQuantities.find(
+              q => q.title === item.title
+            )?.quantity || 0;
+            row.push(quantity);
+            rowTotal += quantity;
+          });
+
+          row.push(rowTotal);
+          rows.push(row);
+        });
+      });
+
+      doc.setFontSize(20);
+      doc.text("Today's Invoice Grid", doc.internal.pageSize.getWidth() / 2, 15, {
+        align: "center",
+      });
+
+      // Add last updated time
+      doc.setFontSize(10);
+      doc.text(
+        `Last updated: ${lastUpdated?.toLocaleString() || "Unknown"}`,
+        10,
+        25
+      );
+
+      doc.autoTable({
+        head: [headers],
+        body: rows,
+        startY: 30,
+        theme: "grid",
+        headStyles: {
+          fillColor: [220, 38, 38] // red-600
+        },
+        alternateRowStyles: {
+          fillColor: [248, 249, 250] // light gray
+        }
+      });
+
+      doc.save(`todays_invoices_${new Date().toISOString()}.pdf`);
+    } catch (err) {
+      setError("Failed to generate PDF");
+      console.error("PDF generation error:", err);
+    }
   };
-  
 
   const downloadSnapshot = async () => {
-    const tableElement = document.getElementById("invoice-table");
-    const canvas = await html2canvas(tableElement);
-    const imageData = canvas.toDataURL("image/png");
+    try {
+      const tableElement = document.getElementById("invoice-table");
+      const canvas = await html2canvas(tableElement);
+      const imageData = canvas.toDataURL("image/png");
 
-    const link = document.createElement("a");
-    link.href = imageData;
-    link.download = "invoice_table_snapshot.png";
-    link.click();
+      const link = document.createElement("a");
+      link.href = imageData;
+      link.download = `invoice_table_${new Date().toISOString()}.png`;
+      link.click();
+    } catch (err) {
+      setError("Failed to capture snapshot");
+      console.error("Snapshot error:", err);
+    }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  if (loading) {
+  if (loading && !lastUpdated) {
     return (
       <Box
         display="flex"
@@ -288,6 +364,27 @@ const TodayInvoicesGrid = () => {
         minHeight={300}
       >
         <CircularProgress color="primary" />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box p={2}>
+        <Alert severity="error">
+          <AlertTitle>Error</AlertTitle>
+          {error}
+          <Box mt={2}>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleRefresh}
+              startIcon={<RefreshIcon />}
+            >
+              Retry
+            </Button>
+          </Box>
+        </Alert>
       </Box>
     );
   }
@@ -307,11 +404,21 @@ const TodayInvoicesGrid = () => {
           <AlertTitle>No Orders Found</AlertTitle>
           There are no orders for today. New orders will appear here as they
           come in.
+          <Box mt={2}>
+            <Button
+              variant="outlined"
+              color="primary"
+              onClick={handleRefresh}
+              startIcon={<RefreshIcon />}
+            >
+              Refresh
+            </Button>
+          </Box>
         </Alert>
       </Box>
     );
   }
-console.log(JSON.stringify(items),"ITEMSSSS")
+
   return (
     <ThemeProvider theme={theme}>
       <Paper
@@ -320,18 +427,32 @@ console.log(JSON.stringify(items),"ITEMSSSS")
           p: 3,
           marginLeft: "3.5%",
           marginTop: "15px",
-          maxWidth: "95%", // Prevent the paper from extending beyond screen
+          maxWidth: "95%",
         }}
       >
-        <Typography
-          variant="h4"
-          color="primary"
-          align="center"
-          gutterBottom
-          sx={{ fontWeight: "bold" }}
-        >
-          Today's Invoice Grid
-        </Typography>
+        <Box display="flex" justifyContent="space-between" alignItems="center">
+          <Typography
+            variant="h4"
+            color="primary"
+            gutterBottom
+            sx={{ fontWeight: "bold" }}
+          >
+            Today's Invoice Grid
+          </Typography>
+          
+          <Box display="flex" alignItems="center" gap={1}>
+            {lastUpdated && (
+              <Typography variant="caption" color="textSecondary">
+                Last updated: {lastUpdated.toLocaleTimeString()}
+              </Typography>
+            )}
+            <Tooltip title="Refresh data">
+              <IconButton onClick={handleRefresh} color="primary">
+                <RefreshIcon />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        </Box>
 
         {/* Table Container */}
         <Box
@@ -370,9 +491,9 @@ console.log(JSON.stringify(items),"ITEMSSSS")
                     color: "white",
                     padding: "16px",
                     border: "1px solid #ddd",
-                    minWidth: { xs: "60px", sm: "150px", md: "200px" }, // Responsive width
-                    maxWidth: { xs: "80px", sm: "180px", md: "250px" },
-                    whiteSpace: "normal", // Allow text wrapping
+                    minWidth: "150px",
+                    maxWidth: "250px",
+                    whiteSpace: "normal",
                     wordWrap: "break-word",
                   }}
                 >
@@ -386,9 +507,9 @@ console.log(JSON.stringify(items),"ITEMSSSS")
                       color: "white",
                       padding: "16px",
                       border: "1px solid #ddd",
-                      minWidth: "150px", // Fixed width for restaurant columns
+                      minWidth: "150px",
                       maxWidth: "200px",
-                      whiteSpace: "normal", // Allow text wrapping
+                      whiteSpace: "normal",
                       wordWrap: "break-word",
                     }}
                   >
@@ -412,122 +533,146 @@ console.log(JSON.stringify(items),"ITEMSSSS")
               </tr>
             </thead>
             <tbody>
-  {Object.entries(items).map(([category, categoryItems], catIndex) => (
-    <React.Fragment key={catIndex}>
-      {/* Category Divider */}
-      <tr>
-        <td
-          colSpan={data.length + 2}
-          style={{
-            backgroundColor: "#f8f9fa",
-            fontWeight: "bold",
-            textAlign: "left",
-            padding: "10px",
-            border: "1px solid #ddd",
-            position: "sticky",
-            top: 0,
-            zIndex: 2,
-          }}
-        >
-          {category}
-        </td>
-      </tr>
+              {Object.entries(items).map(([category, categoryItems]) => (
+                <React.Fragment key={category}>
+                  {/* Category Divider */}
+                  <tr>
+                    <td
+                      colSpan={data.length + 2}
+                      style={{
+                        backgroundColor: "#f8f9fa",
+                        fontWeight: "bold",
+                        textAlign: "left",
+                        padding: "10px",
+                        border: "1px solid #ddd",
+                        position: "sticky",
+                        top: 0,
+                        zIndex: 2,
+                      }}
+                    >
+                      {category}
+                    </td>
+                  </tr>
 
-      {/* Render Items in Category */}
-      {categoryItems.map((item, index) => {
-        const total = data.reduce((sum, restaurant) => {
-          const quantity =
-            restaurant.itemQuantities.find((q) => q.title === item.title)?.quantity || 0;
-          return sum + quantity;
-        }, 0);
+                  {/* Render Items in Category */}
+                  {categoryItems.map((item) => {
+                    const total = data.reduce((sum, restaurant) => {
+                      const quantity =
+                        restaurant.itemQuantities.find(
+                          (q) => q.title === item.title
+                        )?.quantity || 0;
+                      return sum + quantity;
+                    }, 0);
 
-        return (
-          <tr key={index}>
-            {/* Sticky Item Column */}
-            <td
-              style={{
-                padding: "16px",
-                border: "1px solid #ddd",
-                fontWeight: "500",
-                position: "sticky",
-                left: 0,
-                backgroundColor: "#fff",
-                zIndex: 1,
-              }}
-            >
-              {item.title}
-            </td>
+                    return (
+                      <tr key={item.title}>
+                        <td
+                          style={{
+                            padding: "16px",
+                            border: "1px solid #ddd",
+                            fontWeight: "500",
+                            position: "sticky",
+                            left: 0,
+                            backgroundColor: "#fff",
+                            zIndex: 1,
+                          }}
+                        >
+                          {item.title}
+                        </td>
 
-            {/* Restaurant Data */}
-            {data.map((restaurant, i) => (
-              <td key={i} style={{ padding: "16px", border: "1px solid #ddd", textAlign: "center" }}>
-                {restaurant.itemQuantities.find((q) => q.title === item.title)?.quantity || "-"}
-              </td>
-            ))}
+                        {data.map((restaurant) => (
+                          <td
+                            key={restaurant.restaurantName}
+                            style={{
+                              padding: "16px",
+                              border: "1px solid #ddd",
+                              textAlign: "center",
+                            }}
+                          >
+                            {restaurant.itemQuantities.find(
+                              (q) => q.title === item.title
+                            )?.quantity || "-"}
+                          </td>
+                        ))}
 
-            {/* Sticky Total Column */}
-            <td
-              style={{
-                padding: "16px",
-                border: "1px solid #ddd",
-                fontWeight: "bold",
-                textAlign: "center",
-                position: "sticky",
-                right: 0,
-                backgroundColor: "#fff",
-                zIndex: 1,
-              }}
-            >
-              {total}
-            </td>
-          </tr>
-        );
-      })}
-    </React.Fragment>
-  ))}
+                        <td
+                          style={{
+                            padding: "16px",
+                            border: "1px solid #ddd",
+                            fontWeight: "bold",
+                            textAlign: "center",
+                            position: "sticky",
+                            right: 0,
+                            backgroundColor: "#fff",
+                            zIndex: 1,
+                          }}
+                        >
+                          {total}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </React.Fragment>
+              ))}
 
-  {/* Grand Total Row */}
-  <tr style={{ backgroundColor: "#f1f1f1", fontWeight: "bold" }}>
-    <td
-      style={{
-        padding: "16px",
-        border: "1px solid #ddd",
-        position: "sticky",
-        left: 0,
-        backgroundColor: "#fff",
-        zIndex: 2,
-      }}
-    >
-      Total
-    </td>
+              {/* Grand Total Row */}
+              <tr style={{ backgroundColor: "#f1f1f1", fontWeight: "bold" }}>
+                <td
+                  style={{
+                    padding: "16px",
+                    border: "1px solid #ddd",
+                    position: "sticky",
+                    left: 0,
+                    backgroundColor: "#fff",
+                    zIndex: 2,
+                  }}
+                >
+                  Total
+                </td>
 
-    {data.map((restaurant, i) => {
-      const grandTotal = restaurant.itemQuantities.reduce((sum, item) => sum + item.quantity, 0);
-      return (
-        <td key={i} style={{ padding: "16px", border: "1px solid #ddd", textAlign: "center" }}>
-          {grandTotal}
-        </td>
-      );
-    })}
+                {data.map((restaurant) => {
+                  const grandTotal = restaurant.itemQuantities.reduce(
+                    (sum, item) => sum + item.quantity,
+                    0
+                  );
+                  return (
+                    <td
+                      key={restaurant.restaurantName}
+                      style={{
+                        padding: "16px",
+                        border: "1px solid #ddd",
+                        textAlign: "center",
+                      }}
+                    >
+                      {grandTotal}
+                    </td>
+                  );
+                })}
 
-    <td
-      style={{
-        padding: "16px",
-        border: "1px solid #ddd",
-        fontWeight: "bold",
-        textAlign: "center",
-        position: "sticky",
-        right: 0,
-        backgroundColor: "#fff",
-        zIndex: 2,
-      }}
-    >
-      {data.reduce((sum, restaurant) => sum + restaurant.itemQuantities.reduce((s, i) => s + i.quantity, 0), 0)}
-    </td>
-  </tr>
-</tbody>
-
-
+                <td
+                  style={{
+                    padding: "16px",
+                    border: "1px solid #ddd",
+                    fontWeight: "bold",
+                    textAlign: "center",
+                    position: "sticky",
+                    right: 0,
+                    backgroundColor: "#fff",
+                    zIndex: 2,
+                  }}
+                >
+                  {data.reduce(
+                    (sum, restaurant) =>
+                      sum +
+                      restaurant.itemQuantities.reduce(
+                        (s, i) => s + i.quantity,
+                        0
+                      ),
+                    0
+                  )}
+                </td>
+              </tr>
+            </tbody>
           </table>
         </Box>
 
@@ -540,23 +685,14 @@ console.log(JSON.stringify(items),"ITEMSSSS")
           >
             Download PDF
           </Button>
-          {/* <Button
+          <Button
             variant="contained"
             color="secondary"
-            onClick={downloadSnapshot}
+            onClick={downloadExcel}
             sx={{ minWidth: 150 }}
           >
-            Download Snapshot
-          </Button> */}
-          <Button
-  variant="contained"
-  color="secondary"
-  onClick={downloadExcel}
-  sx={{ minWidth: 150 }}
->
-  Download Excel
-</Button>
-
+            Download Excel
+          </Button>
         </Box>
       </Paper>
     </ThemeProvider>
