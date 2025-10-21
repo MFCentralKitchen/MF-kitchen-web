@@ -1,7 +1,7 @@
 // src/screens/login-screen.js
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where, addDoc } from 'firebase/firestore';
 import { db } from '../firebase-config';
 import { AuthContext } from '../auth-context';
 import LOGO from "../assets/MF-CPU-LOGO.png";
@@ -24,9 +24,45 @@ const LoginScreen = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false); // Password visibility state
+  const [showPassword, setShowPassword] = useState(false);
   const { login } = useContext(AuthContext);
   const navigate = useNavigate();
+
+  // TEMPORARY: Create super admin user (run once and then comment out)
+  useEffect(() => {
+    const createSuperAdmin = async () => {
+      try {
+        const superAdminData = {
+          userName: 'superadmin',
+          password: 'superadmin123', // Change this to a secure password
+          role: 'superadmin',
+          createdAt: new Date().toISOString(),
+          email: 'superadmin@madrasflavours.com'
+        };
+
+        // Check if super admin already exists
+        const q = query(
+          collection(db, 'adminUsers'),
+          where('userName', '==', 'superadmin')
+        );
+        const querySnapshot = await getDocs(q);
+
+        if (querySnapshot.empty) {
+          await addDoc(collection(db, 'adminUsers'), superAdminData);
+          console.log('Super admin user created successfully!');
+          console.log('Username: superadmin');
+          console.log('Password: superadmin123');
+        } else {
+          console.log('Super admin user already exists');
+        }
+      } catch (error) {
+        console.error('Error creating super admin:', error);
+      }
+    };
+
+    // UNCOMMENT THE LINE BELOW TO CREATE SUPER ADMIN (RUN ONCE THEN COMMENT AGAIN)
+    // createSuperAdmin();
+  }, []);
 
   const handleLogin = async () => {
     setError('');
@@ -47,7 +83,13 @@ const LoginScreen = () => {
       const querySnapshot = await getDocs(q);
 
       if (!querySnapshot.empty) {
-        login({ username });
+        const userData = querySnapshot.docs[0].data();
+        const user = {
+          username,
+          role: userData.role || 'admin', // Default to 'admin' if role doesn't exist
+          id: querySnapshot.docs[0].id
+        };
+        login(user);
         navigate('/dashboard');
       } else {
         setError('Incorrect username or password');
@@ -76,12 +118,6 @@ const LoginScreen = () => {
           mb={4}
         >
           <img src={LOGO} alt="Logo" style={{ width: '300px' }} />
-          {/* <Typography variant="h4" color="red">
-            Madras Flavours
-          </Typography>
-          <Typography variant="h6" color="black">
-            Central Processing Unit
-          </Typography> */}
         </Box>
 
         {/* Login Form */}

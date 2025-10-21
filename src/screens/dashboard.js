@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState,useContext } from "react";
 import {
   Card,
   CardContent,
@@ -49,6 +49,8 @@ import TodayInvoicesGrid from "../components/TodayInvoicesGrid";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { DateTime } from "luxon";
 import SalesCards from "../components/SalesCards";
+import OrderTimeSettings from "./OrderTimeSettings";
+import { AuthContext } from '../auth-context';
 
 const Dashboard = () => {
   const [orderStatusData, setOrderStatusData] = useState([]);
@@ -63,6 +65,9 @@ const Dashboard = () => {
   const [todayRestaurantOrders, setTodayRestaurantOrders] = useState([]);
   const [restaurantUnpaidRevenue, setRestaurantUnpaidRevenue] = useState([]);
   const [isCutoffEnabled, setIsCutoffEnabled] = useState(false);
+  const { user } = useContext(AuthContext);
+
+  const isSuperAdmin = user?.role === 'superadmin';
 
   const getChartHeight = () => {
     return window.innerWidth <= 768 ? 200 : 300;
@@ -500,7 +505,7 @@ const Dashboard = () => {
         <Typography variant="h6">Allow Mobile Orders</Typography>
         <Switch checked={isCutoffEnabled} onChange={handleToggleChange} />
       </Paper>
-
+  {isSuperAdmin && <OrderTimeSettings />}
       {/* Top Row - KPI Cards */}
       <Grid container spacing={4} sx={{ marginBottom: 4 }}>
         {[

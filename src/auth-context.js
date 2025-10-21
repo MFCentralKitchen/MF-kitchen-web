@@ -8,28 +8,38 @@ export const AuthContext = createContext();
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  // Simulate checking for authentication state (e.g., checking localStorage)
+  // Check for authentication state on component mount
   useEffect(() => {
-    const user = localStorage.getItem('user');
-    if (user) {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      const userData = JSON.parse(storedUser);
+      setUser(userData);
       setIsAuthenticated(true);
     }
   }, []);
 
   const login = (userData) => {
+    setUser(userData);
     setIsAuthenticated(true);
     localStorage.setItem('user', JSON.stringify(userData)); // Save user data in localStorage
   };
 
   const logout = () => {
+    setUser(null);
     setIsAuthenticated(false);
     localStorage.removeItem('user'); // Remove user data from localStorage
   };
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, login, logout }}>
+    <AuthContext.Provider value={{ 
+      isAuthenticated, 
+      user, // Add user to the context value
+      login, 
+      logout 
+    }}>
       {children}
     </AuthContext.Provider>
   );
