@@ -50,7 +50,7 @@ const TodayInvoicesGrid = () => {
     const now = DateTime.now().setZone("Europe/London");
     const startOfDay = now.startOf("day");
     const endOfDay = now.endOf("day");
-    
+
     return {
       start: startOfDay.toISO(),
       end: endOfDay.toISO()
@@ -94,7 +94,7 @@ const TodayInvoicesGrid = () => {
       invoices.forEach(invoice => {
         invoice.items.forEach(item => {
           uniqueItems.add(item.title);
-          
+
           const inventoryItem = inventoryItems.find(
             invItem => invItem.title === item.title
           );
@@ -126,8 +126,8 @@ const TodayInvoicesGrid = () => {
           const quantity = orders
             .flatMap(order => order.items)
             .filter(orderItem => orderItem.title === item.title)
-            .reduce((sum, orderItem) => sum + (orderItem.quantity || 0), 0);
-          return { title: item.title, quantity };
+            .reduce((sum, orderItem) => sum + (Number(orderItem.quantity) || 0), 0); // Ensure number
+          return { title: item.title, quantity: Number(quantity) }; // Ensure number
         });
 
         return { restaurantName: user.restaurantName, itemQuantities };
@@ -207,7 +207,7 @@ const TodayInvoicesGrid = () => {
   // Initialize data fetching
   useEffect(() => {
     const unsubscribePromise = fetchData();
-    
+
     return () => {
       unsubscribePromise.then(unsubscribe => {
         if (unsubscribe && typeof unsubscribe === 'function') {
@@ -287,7 +287,7 @@ const TodayInvoicesGrid = () => {
       Object.entries(items).forEach(([category, categoryItems]) => {
         // Add category header
         rows.push([category, ...Array(headers.length - 1).fill("")]);
-        
+
         // Add items
         categoryItems.forEach(item => {
           const row = [item.title];
@@ -439,7 +439,7 @@ const TodayInvoicesGrid = () => {
           >
             Today's Invoice Grid
           </Typography>
-          
+
           <Box display="flex" alignItems="center" gap={1}>
             {lastUpdated && (
               <Typography variant="caption" color="textSecondary">

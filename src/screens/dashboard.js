@@ -1,4 +1,4 @@
-import React, { useEffect, useState,useContext } from "react";
+import React, { useEffect, useState, useContext } from "react";
 import {
   Card,
   CardContent,
@@ -110,8 +110,8 @@ const Dashboard = () => {
   }, []);
 
 
-   // Handle Manual Toggle Change
-   const handleToggleChange = async () => {
+  // Handle Manual Toggle Change
+  const handleToggleChange = async () => {
     const newValue = !isCutoffEnabled;
     setIsCutoffEnabled(newValue);
 
@@ -125,7 +125,7 @@ const Dashboard = () => {
       console.error("Error updating cutoff status:", error);
     }
   };
-  
+
 
   const [chartHeight, setChartHeight] = useState(getChartHeight());
 
@@ -501,11 +501,11 @@ const Dashboard = () => {
 
   return (
     <Box sx={{ minHeight: "100vh", padding: 4, backgroundColor: "#f9f9f9" }}>
-      <Paper sx={{ padding: 2, display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 2 }}>
+      {/* <Paper sx={{ padding: 2, display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 2 }}>
         <Typography variant="h6">Allow Mobile Orders</Typography>
         <Switch checked={isCutoffEnabled} onChange={handleToggleChange} />
-      </Paper>
-  {isSuperAdmin && <OrderTimeSettings />}
+      </Paper> */}
+      {isSuperAdmin && <OrderTimeSettings />}
       {/* Top Row - KPI Cards */}
       <Grid container spacing={4} sx={{ marginBottom: 4 }}>
         {[
